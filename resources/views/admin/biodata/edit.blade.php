@@ -1,6 +1,6 @@
 @extends('layouts.admin')
 
-@section('title', 'MOOC BPS - Edit Biodata Mitra')
+@section('title', 'MOOC BPS - Edit Biodata Peserta')
 
 @section('styles')
 <style>
@@ -273,16 +273,16 @@
 @section('content') 
 <!-- Welcome Section -->
 <div class="welcome-section">
-    <h1 class="welcome-title">Edit Biodata Mitra</h1>
+    <h1 class="welcome-title">Edit Biodata Peserta</h1>
     <p class="welcome-subtitle">
-        Perbarui data biodata mitra BPS. Pastikan semua data diisi dengan benar.
+        Perbarui data biodata peserta. Pastikan semua data diisi dengan benar.
     </p>
 </div>
 
 <!-- Form Section -->
 <div class="form-container">
     <div class="form-header">
-        <h2 class="form-title">Form Edit Biodata Mitra</h2>
+        <h2 class="form-title">Form Edit Biodata Peserta</h2>
     </div>
     
     <div class="form-content">
@@ -326,7 +326,7 @@
                 <!-- Data untuk User & Login -->
                 <div class="form-section">
                     <h3 class="section-title">
-                        <i class="fas fa-user-lock me-2"></i>Data Login Mitra
+                        <i class="fas fa-user-lock me-2"></i>Data Login Peserta
                     </h3>
 
                     <div class="row">
@@ -469,7 +469,32 @@
                     </div>
                 </div>
 
+                <!-- Foto Profil Section -->
+                <div class="form-group form-group-with-image">
+                    <label for="foto_profil" class="form-label">Foto Profil</label>
 
+                    <input type="file" class="form-control" id="foto_profil" name="foto_profil" 
+                        accept="image/*" onchange="previewImage(this)">
+
+                    <div class="form-text">
+                        Klik choose file untuk mengubah foto. Format: JPG, PNG, GIF. Maksimal 2MB
+                    </div>
+
+                    <div class="image-preview-container">
+                        <div class="image-preview" id="imagePreview">
+                            <img 
+                                src="{{ $biodata->foto_profil ? asset('storage/' . $biodata->foto_profil) : asset('img/default-avatar.png') }}" 
+                                alt="Preview Foto Profil"
+                                style="max-height: 150px;"
+                            >
+                        </div>
+                    </div>
+
+                    @error('foto_profil')
+                        <div class="text-danger">{{ $message }}</div>
+                    @enderror
+                </div>
+                
                 <!-- Submit Button -->
                 <div class="d-flex justify-content-between align-items-center mt-4">
                     <a href="{{ route('admin.biodata.index') }}" class="btn-kembali">
@@ -478,7 +503,7 @@
                     </a>
                     <button type="submit" class="btn-submit">
                         <i class="fas fa-save"></i>
-                        Perbarui Biodata Mitra
+                        Perbarui Biodata Peserta
                     </button>
                 </div>
             </form>

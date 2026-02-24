@@ -52,6 +52,8 @@ class Materials extends Model
         'durasi_posttest' => 'integer',
         'order' => 'integer',
         'duration' => 'integer',
+        'soal_pretest' => 'array',  // <<< TAMBAHKAN INI
+        'soal_posttest' => 'array',
         'allow_skip' => 'boolean',
         'has_video_questions' => 'boolean',
         'require_video_completion' => 'boolean',
@@ -66,11 +68,9 @@ class Materials extends Model
         // JSON casting untuk semua field JSON
         'file_path' => 'array',
         'learning_objectives' => 'array',
-        'soal_pretest' => 'array',
-        'soal_posttest' => 'array',
         'video_file' => 'array',
         'player_config' => 'array',
-    ];
+    ]; 
 
     /**
      * Mutator untuk video_file dengan validasi JSON yang kuat
@@ -155,6 +155,35 @@ class Materials extends Model
             }
         );
     }
+
+    // Accessor untuk video data
+public function getVideoDataAttribute()
+{
+    if (!empty($this->video_file)) {
+        if (is_array($this->video_file)) {
+            return $this->video_file;
+        }
+        
+        if (is_string($this->video_file)) {
+            $decoded = json_decode($this->video_file, true);
+            return $decoded ?: [];
+        }
+    }
+    
+    return [];
+}
+
+// Method untuk cek apakah memiliki file
+public function getHasFileAttribute()
+{
+    return !empty($this->file_path) && is_array($this->file_path) && count($this->file_path) > 0;
+}
+
+// Method untuk cek apakah memiliki video
+public function getHasVideoAttribute()
+{
+    return !empty($this->video_url) || !empty($this->video_file);
+}
 
     /**
      * Check if string is valid JSON

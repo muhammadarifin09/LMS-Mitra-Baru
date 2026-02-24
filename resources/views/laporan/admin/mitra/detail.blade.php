@@ -300,7 +300,7 @@
                     <div class="col-md-6">
                         <h4 class="page-title mb-0">
                             <i class="fas fa-user-circle me-2"></i>
-                            Detail Laporan: {{ $mitra->nama }}
+                            Detail Laporan: {{ $mitra->biodata->nama_lengkap }}
                         </h4>
                     </div>
                     <div class="col-md-6 text-md-end">
@@ -340,7 +340,7 @@
             <div class="col-md-6">
                 <div class="info-inline">
                     <span class="label">Nama Lengkap</span>
-                    <span class="value">{{ $mitra->nama }}</span>
+                    <span class="value">{{ $mitra->biodata->nama_lengkap }}</span>
                 </div>
             </div>
             <div class="col-md-6">
@@ -389,15 +389,7 @@
                 <div class="info-inline">
                     <span class="label">Rata-rata Nilai</span>
                     <span class="value">
-                        @php
-                            $nilaiData = collect($kursusData)
-                                ->where('progress', 100)
-                                ->pluck('nilai')
-                                ->filter();
-                            echo $nilaiData->isNotEmpty()
-                                ? round($nilaiData->avg(), 2)
-                                : '-';
-                        @endphp
+                        {{ $rataNilai !== null ? $rataNilai : '-' }}
                     </span>
                 </div>
             </div>
@@ -538,7 +530,7 @@
                             </div>
                         </td>
                         <td class="text-center">
-                            @if($data['progress'] == 100 && $data['nilai'] !== null)
+                            @if($data['nilai'] !== null)
                                 <span class="badge-custom bg-success" style="color: white;">
                                     {{ $data['nilai'] }}
                                 </span>

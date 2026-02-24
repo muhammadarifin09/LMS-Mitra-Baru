@@ -19,11 +19,23 @@ class CertificateService
     public function generateCertificateNumber(Enrollment $enrollment): string
     {
         $year = date('Y');
-        $sequence = Certificate::whereYear('issued_at', $year)->count() + 1;
-        $formattedSequence = str_pad($sequence, 3, '0', STR_PAD_LEFT);
-        
+
+        // Ambil sertifikat terakhir tahun ini
+        $last = Certificate::whereYear('issued_at', $year)
+            ->orderBy('id', 'desc')
+            ->first();
+
+        if ($last && preg_match('/No\.\s*(\d+)/', $last->certificate_number, $m)) {
+            $next = intval($m[1]) + 1;
+        } else {
+            $next = 1;
+        }
+
+        $formattedSequence = str_pad($next, 3, '0', STR_PAD_LEFT);
+
         return "No. {$formattedSequence}/MOOC/BPS.TanahLaut/{$year}";
     }
+
 
     public function generateIdKredensial(): string
     {
@@ -213,93 +225,4 @@ class CertificateService
         return 'data:image/svg+xml;base64,' . base64_encode($svg);
     }
 
-
-
-
-    /**
-     * Check enrollment progress and issue certificate if completed
-     */
-    // public function checkAndIssueCertificate(Enrollment $enrollment): ?Certificate
-    // {
-    //     // Jika progress 100% dan status belum completed, update status
-    //     if ($enrollment->progress_percentage >= 100 && $enrollment->status !== 'completed') {
-    //         $enrollment->update([
-    //             'status' => 'completed',
-    //             'completed_at' => now(),
-    //         ]);
-    //     }
-        
-    //     // Jika status completed, buat sertifikat
-    //     if ($enrollment->status === 'completed') {
-    //         return $this->createCertificate($enrollment);
-    //     }
-        
-    //     return null;
-    // }
-
-    /**
-     * Create certificate for completed enrollment
-     */
-    // public function createCertificateRecord(Enrollment $enrollment): ?Certificate
-    // {
-    //     try {
-    //         // Pastikan enrollment sudah completed
-    //         if ($enrollment->status !== 'completed') {
-    //             Log::warning('Enrollment not completed, cannot create certificate', [
-    //                 'enrollment_id' => $enrollment->id,
-    //                 'status' => $enrollment->status,
-    //             ]);
-    //             return null;
-    //         }
-
-    //         // Cek apakah sudah ada sertifikat
-    //         if ($enrollment->certificate) {
-    //             Log::info('Certificate already exists for enrollment', [
-    //                 'enrollment_id' => $enrollment->id,
-    //                 'certificate_id' => $enrollment->certificate->id,
-    //             ]);
-    //             return $enrollment->certificate;
-    //         }
-
-    //         // Generate certificate number
-    //         $certificateNumber = $this->generateCertificateNumber($enrollment);
-            
-    //         Log::info('Creating certificate record', [
-    //             'enrollment_id' => $enrollment->id,
-    //             'certificate_number' => $certificateNumber,
-    //         ]);
-
-    //         // Buat record sertifikat
-    //         $certificate = Certificate::create([
-    //             'certificate_number' => $certificateNumber,
-    //             'enrollment_id' => $enrollment->id,
-    //             'user_id' => $enrollment->user_id,
-    //             'kursus_id' => $enrollment->kursus_id,
-    //             'issued_at' => now(),
-    //         ]);
-
-    //         // Generate PDF (bisa di-queue nanti)
-    //         try {
-    //             $this->generateCertificatePDF($certificate);
-    //             Log::info('PDF generated for certificate', [
-    //                 'certificate_id' => $certificate->id,
-    //             ]);
-    //         } catch (\Exception $e) {
-    //             Log::error('Failed to generate PDF, but certificate record created', [
-    //                 'certificate_id' => $certificate->id,
-    //                 'error' => $e->getMessage(),
-    //             ]);
-    //         }
-
-    //         return $certificate;
-
-    //     } catch (\Exception $e) {
-    //         Log::error('Error creating certificate record', [
-    //             'enrollment_id' => $enrollment->id,
-    //             'error' => $e->getMessage(),
-    //             'trace' => $e->getTraceAsString(),
-    //         ]);
-    //         return null;
-    //     }
-    // }
 }

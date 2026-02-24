@@ -624,14 +624,16 @@ function submitTest() {
     });
 
     // Kirim data
-    fetch('{{ route("mitra.kursus.test.submit", [$kursus->id, $material->id, $testType]) }}', {
-        method: 'POST',
-        body: formData,
-        headers: {
-            'X-CSRF-TOKEN': '{{ csrf_token() }}',
-            'X-Requested-With': 'XMLHttpRequest',
-            'Accept': 'application/json',
-        }
+// GANTI line 407-411 dengan:
+fetch('{{ route("mitra.kursus.test.submit", [$kursus->id, $material->id, $testType]) }}', {
+    method: 'POST',
+    body: formData,
+    headers: {
+        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json',
+    }
+})
     })
     .then(response => {
         if (!response.ok) {
@@ -727,7 +729,7 @@ document.addEventListener('DOMContentLoaded', function() {
         testType: '{{ $testType }}',
         materialId: '{{ $material->id }}',
         kursusId: '{{ $kursus->id }}',
-        submitUrl: '{{ route("mitra.kursus.test.submit", [$kursus->id, $material->id, $testType]) }}'
+        submitUrl: '{{ route("mitra.kursus.materials.take-test.submit", [$kursus->id, $material->id, $testType]) }}'
     });
 });
 

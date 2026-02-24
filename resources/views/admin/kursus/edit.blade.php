@@ -238,13 +238,12 @@
                     <div class="form-group">
                         <label for="enroll_code" class="form-label">
                             Kode Enroll Kursus
-                            <span class="text-muted">(opsional)</span>
                         </label>
                         <input type="text"
                             class="form-control"
                             id="enroll_code"
                             name="enroll_code"
-                            value="{{ old('enroll_code') }}"
+                            value="{{ old('enroll_code', $kursus->enroll_code) }}"
                             placeholder="Contoh: BPS-TALA-2025">
                         <div class="form-text">
                             Isi jika kursus hanya boleh diikuti mitra tertentu.

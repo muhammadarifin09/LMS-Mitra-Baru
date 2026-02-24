@@ -40,7 +40,7 @@ class UserVideoProgress extends Model
 
     public function user()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(M_User::class);
     }
 
     public function material()

@@ -529,17 +529,6 @@
         
         <!-- Tambahkan bagian ikon di sini -->
         <div class="d-flex align-items-center">
-            <!-- Ikon Bahasa -->
-            <div class="nav-icon me-3">
-                <i class="fas fa-globe"></i>
-            </div>
-            
-            <!-- Ikon Notifikasi -->
-            <div class="nav-icon me-3">
-                <i class="fas fa-bell"></i>
-                <span class="notification-badge">3</span>
-            </div>
-            
             <!-- User Profile dengan Foto - VERSI DIPERBAIKI -->
             <a href="{{ route('profil.index') }}" class="user-profile">
                 <div class="user-avatar">

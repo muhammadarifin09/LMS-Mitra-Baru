@@ -1,6 +1,6 @@
 @extends('layouts.admin')
 
-@section('title', 'MOOC BPS - Manajemen Biodata Mitra')
+@section('title', 'MOOC BPS - Manajemen Biodata Peserta')
 
 @section('styles')
 
@@ -236,9 +236,9 @@
 @section('content')
 <!-- WELCOME SECTION -->
 <div class="welcome-section">
-    <h1 class="welcome-title">Manajemen Biodata Mitra</h1>
+    <h1 class="welcome-title">Manajemen Biodata Peserta</h1>
     <p class="welcome-subtitle">
-        Kelola data biodata mitra BPS dengan mudah. Lihat, edit, atau hapus data mitra sesuai kebutuhan.
+        Kelola data biodata peserta MOOC dengan mudah. Lihat, edit, atau hapus data peserta sesuai kebutuhan.
     </p>
 </div>
 
@@ -246,7 +246,7 @@
 <div class="table-container">
     <div class="table-header">
         <div class="d-flex align-items-center gap-3">
-            <h2 class="table-title mb-0">Daftar Biodata Mitra</h2>
+            <h2 class="table-title mb-0">Daftar Biodata Peserta</h2>
 
             <div class="search-box">
                 <form method="GET" action="{{ url()->current() }}">
@@ -314,7 +314,7 @@
                             @if(!isset($biodata))
                                 Variabel $biodata tidak terdefinisi
                             @else
-                                Tidak ada data biodata mitra
+                                Tidak ada data biodata peserta
                             @endif
                         </td>
                     </tr>
@@ -416,7 +416,7 @@
         
         Swal.fire({
             title: 'Apakah Anda yakin?',
-            text: "Data biodata dan akun mitra akan dihapus permanen!",
+            text: "Data biodata dan akun akan dihapus permanen!",
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#d33',

@@ -156,7 +156,7 @@
                                                 <tr>
                                                     <td class="text-center">{{ $loop->iteration }}</td>
                                                     <td>
-                                                        <strong>{{ $data['user']->nama ?? ($data['user']->name ?? 'N/A') }}</strong>
+                                                        <strong>{{ $data['user']->nama ?? ($data['user']->nama ?? 'N/A') }}</strong>
                                                     </td>
                                                     <td>
                                                         <small class="text-muted">{{ $data['user']->email ?? ($data['user']->username ?? 'N/A') }}</small>

@@ -7,12 +7,9 @@
         </div>
         
         <div class="d-flex align-items-center">
-            <div class="nav-icon me-3">
-                <i class="fas fa-globe"></i>
-            </div>
             
-            <!-- Include Notifikasi Dropdown -->
-           @include('admin.partials.notification-dropdown')
+            
+            
             
             <!-- User Profile dengan Dropdown -->
             <div class="user-profile" id="userProfileDropdown">

@@ -338,38 +338,6 @@
     .video-info-badge i {
         margin-right: 5px;
     }
-
-<<<<<<< HEAD
-    .video-debug-info {
-        font-size: 0.75rem;
-        background: #f8f9fa;
-        border: 1px solid #dee2e6;
-        border-radius: 4px;
-        padding: 8px;
-        margin-top: 5px;
-        color: #6c757d;
-    }
-    
-    .video-debug-info strong {
-        color: #495057;
-    }
-    
-    /* Styling untuk warning video tidak tersedia */
-    .video-not-available {
-        background: #fff3cd;
-        border: 1px solid #ffeaa7;
-        border-radius: 4px;
-        padding: 8px;
-        margin-top: 5px;
-        color: #856404;
-        font-size: 0.8rem;
-    }
-    
-    .video-not-available i {
-        color: #856404;
-        margin-right: 5px;
-    }
-=======
     /* =========================
     RESPONSIVE DESIGN UNTUK MOBILE (<500px)
     ========================= */
@@ -914,40 +882,7 @@
                         <div class="task-info">
                             <div class="task-name">Video Pelatihan</div>
                             <div class="task-description">Tonton video materi</div>
-                            
-                            <!-- Informasi platform video -->
-                            <div class="video-info-badge">
-                                <i class="{{ $platformIcon }}"></i> {{ $platformName }}
-                            </div>
-                            
-                            <!-- Durasi video jika ada -->
-                            @if(!empty($videoData['duration']) && $videoData['duration'] > 0)
-                            <div style="font-size: 0.8rem; color: #6c757d; margin-top: 3px;">
-                                <i class="fas fa-clock me-1"></i>
-                                Durasi: {{ gmdate("i:s", $videoData['duration']) }}
-                            </div>
-                            @endif
-                            
-                            <!-- Debug info (bisa dihilangkan setelah fix) -->
-                            @if(!$isVideoAvailable && $material['has_video'])
-                            <div class="video-not-available">
-                                <i class="fas fa-exclamation-triangle"></i>
-                                Video tidak tersedia atau format tidak didukung.
-                                
-                                @if(app()->environment('local'))
-                                <div class="video-debug-info">
-                                    <strong>Debug Info:</strong><br>
-                                    Type: {{ $videoType }}<br>
-                                    Has Data: {{ $hasVideoData ? 'Yes' : 'No' }}<br>
-                                    Has Embed URL: {{ $hasEmbedUrl ? 'Yes' : 'No' }}<br>
-                                    Has Direct Link: {{ $hasDirectLink ? 'Yes' : 'No' }}<br>
-                                    @if($hasVideoData)
-                                    Data Keys: {{ implode(', ', array_keys($videoData)) }}
-                                    @endif
-                                </div>
-                                @endif
-                            </div>
-                            @endif
+
                         </div>
                         <div class="task-action">
                             @if($material['video_status'] == 'completed')
@@ -1245,6 +1180,81 @@ function notifyServerMaterialCompleted(materialId) {
 }
 
 /**
+ * Alternative: Gunakan event listener untuk deteksi download selesai
+ */
+function handleDownloadWithEvent(event, materialId, kursusId) {
+    event.preventDefault();
+    
+    Swal.fire({
+        title: 'Menyiapkan file...',
+        text: 'Sedang mempersiapkan file untuk didownload.',
+        icon: 'info',
+        showConfirmButton: false,
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+    
+    // Buat iframe untuk download
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = `/mitra/kursus/${kursusId}/materials/${materialId}/download`;
+    document.body.appendChild(iframe);
+    
+    // Deteksi ketika download selesai
+    iframe.onload = function() {
+        setTimeout(() => {
+            Swal.close();
+            
+            // Update UI
+            updateMaterialStatus(materialId, kursusId);
+            
+            // Cek dan unlock material berikutnya
+            checkAndUnlockNextMaterial(materialId);
+            
+            Swal.fire({
+                title: 'Berhasil!',
+                text: 'File berhasil didownload. Materi berikutnya sekarang terbuka!',
+                icon: 'success',
+                timer: 3000,
+                showConfirmButton: false
+            });
+            
+            // Hapus iframe
+            document.body.removeChild(iframe);
+        }, 1000);
+    };
+}
+
+/**
+ * Cek dan unlock material berikutnya via AJAX
+ */
+function checkAndUnlockNextMaterial(currentMaterialId) {
+    const kursusId = {{ $kursus->id }};
+    
+    fetch(`/mitra/kursus/${kursusId}/materials/${currentMaterialId}/check-unlock`, {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.next_material_id) {
+            // Unlock material berikutnya
+            unlockNextMaterial(currentMaterialId);
+        }
+    })
+    .catch(error => {
+        console.error('Error checking unlock:', error);
+    });
+}
+
+/**
  * Handle download file
  */
 function handleDownload(event, materialId, kursusId) {
@@ -1392,6 +1402,86 @@ function handleVideoWatch(event, materialId, kursusId) {
     .catch(error => {
         console.error('Error recording video:', error);
     });
+}
+
+// ==============================================
+// LISTENER UNTUK UPDATE DARI VIDEO PLAYER
+// ==============================================
+
+// Listen for messages from video player
+window.addEventListener('message', function(event) {
+    if (event.data.type === 'video_completed') {
+        if (event.data.materialId && event.data.kursusId === {{ $kursus->id }}) {
+            console.log(`🎬 Video ${event.data.materialId} completed, updating UI...`);
+            updateVideoProgress(event.data.materialId);
+            updateProgressBar();
+        }
+    }
+});
+
+// Auto-refresh saat kembali dari video player
+window.addEventListener('pageshow', function(event) {
+    if (event.persisted || performance.getEntriesByType("navigation")[0].type === 'back_forward') {
+        console.log('🔄 Page restored from bfcache, refreshing progress...');
+        setTimeout(() => {
+            updateProgressBar();
+            refreshMaterialStatus();
+        }, 500);
+    }
+});
+
+// Refresh material status
+function refreshMaterialStatus() {
+    const currentMaterials = document.querySelectorAll('.flow-step.current');
+    
+    currentMaterials.forEach(materialStep => {
+        const materialId = materialStep.getAttribute('id').replace('material-', '');
+        
+        fetch(`/mitra/kursus/{{ $kursus->id }}/material/${materialId}/status`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateMaterialUI(materialId, data);
+            }
+        })
+        .catch(error => {
+            console.error('Error refreshing material status:', error);
+        });
+    });
+}
+
+function updateMaterialUI(materialId, data) {
+    const materialStep = document.getElementById(`material-${materialId}`);
+    if (!materialStep) return;
+    
+    // Update video status jika ada
+    if (data.video_status === 'completed') {
+        updateVideoProgress(materialId);
+    }
+    
+    // Update attendance status jika ada
+    if (data.attendance_status === 'completed') {
+        updateAttendanceUI(materialId);
+    }
+    
+    // Update material status jika ada
+    if (data.material_status === 'completed') {
+        const materialIcon = document.getElementById(`material-icon-${materialId}`);
+        if (materialIcon) {
+            materialIcon.style.background = '#28a745';
+            materialIcon.style.color = 'white';
+        }
+    }
+    
+    // Cek apakah semua selesai
+    if (checkAllSubTasksCompleted(materialId)) {
+        updateMaterialToCompleted(materialId);
+    }
 }
 
 /**

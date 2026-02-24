@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Biodata;
+use App\Models\M_User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -58,7 +59,7 @@ class ProfilController extends Controller
         'kecamatan' => 'required|string|max:255',
         'desa' => 'required|string|max:255',
         'alamat' => 'required|string',
-        'no_telepon' => 'required|string|max:15',
+        'no_telepon' => 'required|string|max:20',
 
         // ===== KOLOM BARU =====
         'posisi' => 'nullable|string|max:100',
@@ -114,6 +115,12 @@ class ProfilController extends Controller
     }
 
     $biodata->save();
+
+    // Sinkronkan nama ke tabel users
+    M_User::where('id', $biodata->user_id)
+        ->update([
+            'nama' => $request->nama_lengkap
+        ]);
 
     return redirect()->route('profil.index')
         ->with('success', 'Profil berhasil diperbarui!');

@@ -274,7 +274,7 @@
                     @foreach($mitra as $item)
                     <tr>
                         <td>{{ ($mitra->currentPage() - 1) * $mitra->perPage() + $loop->iteration }}</td>
-                        <td>{{ $item->nama }}</td>
+                        <td>{{ $item->biodata->nama_lengkap }}</td>
                         <td>{{ $item->biodata->id_sobat ?? '-' }}</td>
                         <td>{{ $item->biodata->kecamatan ?? '-' }}</td>
                         <td>{{ $item->enrollments_count }}</td>

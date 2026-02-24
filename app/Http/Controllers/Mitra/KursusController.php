@@ -8,6 +8,7 @@ use App\Models\Kursus;
 use App\Models\Materials;
 use App\Models\Enrollment;
 use Illuminate\Http\Request;
+use App\Models\UserVideoQuestionAnswer;
 use App\Models\VideoQuestion;
 use App\Models\MaterialProgress;
 use App\Http\Controllers\Controller;
@@ -128,6 +129,257 @@ class KursusController extends Controller
 
         return view('mitra.kursus-saya', compact('enrollments', 'filter'));
     }
+
+    private function getDurationWithFFprobe($filePath)
+{
+    try {
+        // Cari ffprobe di berbagai lokasi umum
+        $possiblePaths = [
+            'ffprobe',
+            '/usr/bin/ffprobe',
+            '/usr/local/bin/ffprobe',
+            '/opt/homebrew/bin/ffprobe',
+            '/opt/local/bin/ffprobe',
+            'C:\ffmpeg\bin\ffprobe.exe',
+            'C:\Program Files\ffmpeg\bin\ffprobe.exe',
+            storage_path('ffmpeg/bin/ffprobe.exe'),
+            base_path('vendor/bin/ffprobe')
+        ];
+        
+        $ffprobePath = null;
+        foreach ($possiblePaths as $path) {
+            $testCommand = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN' 
+                ? "where $path 2>nul" 
+                : "command -v $path 2>/dev/null";
+            
+            $result = shell_exec($testCommand);
+            if ($result && trim($result)) {
+                $ffprobePath = $path;
+                break;
+            }
+        }
+        
+        if (!$ffprobePath) {
+            Log::warning('FFprobe not found in any common location');
+            return 0;
+        }
+        
+        Log::info('Found ffprobe at:', ['path' => $ffprobePath]);
+        
+        // Eksekusi ffprobe
+        $command = escapeshellcmd($ffprobePath) . 
+                  ' -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 ' . 
+                  escapeshellarg($filePath) . ' 2>&1';
+        
+        Log::debug('Executing ffprobe command:', ['command' => $command]);
+        
+        $output = shell_exec($command);
+        Log::debug('FFprobe output:', ['output' => $output]);
+        
+        if ($output && is_numeric(trim($output))) {
+            $duration = (float)trim($output);
+            Log::info('✅ FFprobe duration found:', ['duration' => $duration]);
+            return $duration;
+        }
+        
+    } catch (\Exception $e) {
+        Log::error('FFprobe error:', ['error' => $e->getMessage()]);
+    }
+    
+    return 0;
+}
+
+private function getDurationWithPHPFFmpeg($filePath)
+{
+    try {
+        if (class_exists('\FFMpeg\FFMpeg')) {
+            $ffmpeg = \FFMpeg\FFMpeg::create();
+            $video = $ffmpeg->open($filePath);
+            $duration = $video->getStreams()->first()->get('duration');
+            
+            if ($duration) {
+                Log::info('✅ PHP-FFMpeg duration found:', ['duration' => $duration]);
+                return (float)$duration;
+            }
+        }
+    } catch (\Exception $e) {
+        Log::warning('PHP-FFMpeg not available or error:', ['error' => $e->getMessage()]);
+    }
+    
+    return 0;
+}
+
+private function getWebMDuration($filePath)
+{
+    try {
+        // WebM menggunakan EBML format, kompleks untuk parsing manual
+        // Lebih baik gunakan library atau shell command
+        return 0; // Return 0 untuk trigger metode lain
+    } catch (\Exception $e) {
+        return 0;
+    }
+}
+
+private function getMP4DurationManually($filePath)
+{
+    try {
+        $file = fopen($filePath, 'rb');
+        if (!$file) {
+            Log::warning('Cannot open MP4 file for reading');
+            return 0;
+        }
+        
+        $size = filesize($filePath);
+        $offset = 0;
+        
+        while ($offset < $size) {
+            fseek($file, $offset);
+            
+            // Baca atom size (4 bytes big-endian)
+            $atomSizeData = fread($file, 4);
+            if (strlen($atomSizeData) < 4) break;
+            
+            $atomSize = unpack('N', $atomSizeData)[1];
+            if ($atomSize < 1) break;
+            
+            // Baca atom type (4 bytes)
+            $atomType = fread($file, 4);
+            
+            Log::debug('MP4 Atom:', [
+                'offset' => $offset,
+                'size' => $atomSize,
+                'type' => $atomType
+            ]);
+            
+            // Cari 'moov' atom
+            if ($atomType == 'moov') {
+                $moovStart = $offset + 8;
+                $moovEnd = $moovStart + $atomSize - 8;
+                
+                // Cari 'mvhd' atom di dalam 'moov'
+                fseek($file, $moovStart);
+                while (ftell($file) < $moovEnd) {
+                    $innerSize = unpack('N', fread($file, 4))[1];
+                    $innerType = fread($file, 4);
+                    
+                    if ($innerType == 'mvhd') {
+                        // Skip version (1 byte) dan flags (3 bytes)
+                        fread($file, 4);
+                        
+                        // Baca creation time dan modification time (masing-masing 4 bytes)
+                        fread($file, 8);
+                        
+                        // Baca timescale (4 bytes)
+                        $timescale = unpack('N', fread($file, 4))[1];
+                        
+                        // Baca duration (4 bytes)
+                        $duration = unpack('N', fread($file, 4))[1];
+                        
+                        fclose($file);
+                        
+                        if ($timescale > 0) {
+                            $result = $duration / $timescale;
+                            Log::info('✅ MP4 manual duration found:', [
+                                'duration' => $result,
+                                'timescale' => $timescale
+                            ]);
+                            return $result;
+                        }
+                    } else {
+                        // Skip ke atom berikutnya
+                        fseek($file, ftell($file) + $innerSize - 8);
+                    }
+                }
+            }
+            
+            $offset += $atomSize;
+        }
+        
+        fclose($file);
+    } catch (\Exception $e) {
+        Log::error('Error reading MP4 manually:', ['error' => $e->getMessage()]);
+    }
+    
+    return 0;
+}
+
+    /**
+ * Helper untuk membaca durasi video dari file dengan beberapa metode
+ */
+private function getVideoDurationFromFile($filePath)
+{
+    if (!file_exists($filePath)) {
+        Log::warning('Video file does not exist:', ['path' => $filePath]);
+        return 0;
+    }
+    
+    // Log info file
+    Log::info('Reading video duration:', [
+        'file_path' => $filePath,
+        'file_size' => filesize($filePath),
+        'file_exists' => true,
+        'mime_type' => mime_content_type($filePath)
+    ]);
+    
+    // METODE 1: getID3 (Library PHP terbaik)
+    if (class_exists('\getID3')) {
+        try {
+            $getID3 = new \getID3();
+            $fileInfo = $getID3->analyze($filePath);
+            
+            Log::info('getID3 analysis result:', [
+                'playtime_seconds' => $fileInfo['playtime_seconds'] ?? null,
+                'fileformat' => $fileInfo['fileformat'] ?? null,
+                'mime_type' => $fileInfo['mime_type'] ?? null,
+                'has_video' => isset($fileInfo['video']),
+                'has_audio' => isset($fileInfo['audio'])
+            ]);
+            
+            if (isset($fileInfo['playtime_seconds'])) {
+                $duration = (float)$fileInfo['playtime_seconds'];
+                Log::info('✅ getID3 duration found:', ['duration' => $duration]);
+                return $duration;
+            }
+        } catch (\Exception $e) {
+            Log::error('getID3 error:', ['error' => $e->getMessage()]);
+        }
+    } else {
+        Log::warning('getID3 class not available');
+    }
+    
+    // METODE 2: FFprobe (jika terinstall di server)
+    $ffprobeDuration = $this->getDurationWithFFprobe($filePath);
+    if ($ffprobeDuration > 0) {
+        return $ffprobeDuration;
+    }
+    
+    // METODE 3: PHP FFmpeg (library alternatif)
+    $ffmpegDuration = $this->getDurationWithPHPFFmpeg($filePath);
+    if ($ffmpegDuration > 0) {
+        return $ffmpegDuration;
+    }
+    
+    // METODE 4: Untuk MP4 files - baca manual
+    $mimeType = mime_content_type($filePath);
+    if (strpos($mimeType, 'mp4') !== false) {
+        $mp4Duration = $this->getMP4DurationManually($filePath);
+        if ($mp4Duration > 0) {
+            return $mp4Duration;
+        }
+    }
+    
+    // METODE 5: Untuk WebM files
+    if (strpos($mimeType, 'webm') !== false) {
+        $webmDuration = $this->getWebMDuration($filePath);
+        if ($webmDuration > 0) {
+            return $webmDuration;
+        }
+    }
+    
+    Log::warning('❌ Could not determine video duration with any method');
+    return 0;
+}
+
 
     /**
      * Helper method untuk mendapatkan content types dari learning_objectives
@@ -410,75 +662,162 @@ class KursusController extends Controller
         return true;
     }
 
-    /**
-     * Helper method untuk cek apakah material sudah selesai (sesuai dengan admin)
-     */
     private function isMaterialCompleted($progress, $material)
-    {
-        if (!$progress) {
-            return false;
-        }
-
-        $contentTypes = $this->getContentTypes($material->learning_objectives);
-        $isPretest = in_array('pretest', $contentTypes);
-        $isPosttest = in_array('posttest', $contentTypes);
-        $isRecap = $material->type === 'recap';
-
-        // For test materials
-        if ($isPretest) {
-            return $progress->pretest_score !== null;
-        } elseif ($isPosttest) {
-            return $progress->posttest_score !== null;
-        } elseif ($isRecap) {
-            // Recap selalu bisa diakses
-            return true;
-        }
-        
-        // Untuk material reguler
-        $hasFile = in_array('file', $contentTypes);
-        $hasVideo = in_array('video', $contentTypes);
-        $hasAttendance = in_array('attendance', $contentTypes) || ($material->attendance_required ?? true);
-        
-        $attendanceCompleted = !$hasAttendance || $progress->attendance_status === 'completed';
-        
-        // Cek file completion
-        $fileCompleted = true;
-        if ($hasFile && !empty($material->file_path)) {
-            $filePaths = $this->parseFilePath($material->file_path);
-            $totalFiles = count($filePaths);
-            
-            if ($totalFiles > 0) {
-                if ($progress->all_files_downloaded) {
-                    $fileCompleted = true;
-                } else {
-                    $downloadedFiles = $this->safeJsonDecode($progress->downloaded_files, []);
-                    $fileCompleted = (count($downloadedFiles) >= $totalFiles);
-                }
-            }
-            
-            if (!$fileCompleted && $progress->material_status === 'completed') {
-                $fileCompleted = true;
-            }
-        }
-        
-        // Cek video completion
-        $videoCompleted = true;
-        if ($hasVideo) {
-            $videoCompleted = $progress->video_status === 'completed';
-            
-            if ($videoCompleted && $material->require_video_completion) {
-                $minWatchPercentage = 90;
-                $playerConfig = $this->safeJsonDecode($material->player_config, []);
-                
-                $videoProgress = $progress->video_progress ?? 0;
-                if ($videoProgress < $minWatchPercentage) {
-                    $videoCompleted = false;
-                }
-            }
-        }
-        
-        return $attendanceCompleted && $fileCompleted && $videoCompleted;
+{
+    if (!$progress) {
+        return false;
     }
+
+    $contentTypes = $this->getContentTypes($material->learning_objectives);
+    $isPretest = in_array('pretest', $contentTypes);
+    $isPosttest = in_array('posttest', $contentTypes);
+    $isRecap = $material->type === 'recap';
+
+    // For test materials
+    if ($isPretest) {
+        return $progress->pretest_score !== null;
+    } elseif ($isPosttest) {
+        return $progress->posttest_score !== null;
+    } elseif ($isRecap) {
+        return true;
+    }
+    
+    // Untuk material reguler
+    $hasFile = in_array('file', $contentTypes);
+    $hasVideo = in_array('video', $contentTypes);
+    $hasAttendance = in_array('attendance', $contentTypes) || ($material->attendance_required ?? true);
+    
+    $attendanceCompleted = !$hasAttendance || $progress->attendance_status === 'completed';
+    
+    // Cek file completion
+    $fileCompleted = true;
+    if ($hasFile && !empty($material->file_path)) {
+        $filePaths = $this->parseFilePath($material->file_path);
+        $totalFiles = count($filePaths);
+        
+        if ($totalFiles > 0) {
+            if ($progress->all_files_downloaded) {
+                $fileCompleted = true;
+            } else {
+                $downloadedFiles = $this->safeJsonDecode($progress->downloaded_files, []);
+                $fileCompleted = (count($downloadedFiles) >= $totalFiles);
+            }
+        }
+    }
+    
+    // Cek video completion - PERBAIKAN: HARUS 100%
+    $videoCompleted = true;
+    if ($hasVideo) {
+        // VIDEO HARUS DITONTON 100% - TIDAK ADA KOMPROMI
+        $videoWatchedCompleted = false;
+        if ($material->require_video_completion) {
+            $minWatchPercentage = 100; // UBAH DARI 90 KE 100
+            $videoProgress = $progress->video_progress ?? 0;
+            $videoWatchedCompleted = ($videoProgress >= $minWatchPercentage);
+        } else {
+            // Default juga harus 100%
+            $videoWatchedCompleted = ($progress->video_progress ?? 0) >= 100;
+        }
+        
+        // Cek pertanyaan video
+        $videoQuestionsCompleted = true;
+        if ($material->has_video_questions && $material->total_video_points > 0) {
+            // Cek apakah semua pertanyaan video sudah terjawab
+            $totalQuestions = $material->question_count ?? VideoQuestion::where('material_id', $material->id)->count();
+            $answeredQuestions = UserVideoQuestionAnswer::where('user_id', $progress->user_id)
+                ->where('material_id', $material->id)
+                ->count();
+            
+            $videoQuestionsCompleted = ($answeredQuestions >= $totalQuestions);
+            
+            // Log untuk debugging
+            Log::info('Video Questions Completion Check:', [
+                'material_id' => $material->id,
+                'user_id' => $progress->user_id,
+                'total_questions' => $totalQuestions,
+                'answered_questions' => $answeredQuestions,
+                'is_completed' => $videoQuestionsCompleted
+            ]);
+        }
+        
+        // Video selesai hanya jika video ditonton 100% DAN semua pertanyaan terjawab
+        $videoCompleted = $videoWatchedCompleted && $videoQuestionsCompleted;
+        
+        Log::info('Video Completion Check:', [
+            'material_id' => $material->id,
+            'user_id' => $progress->user_id,
+            'video_progress' => $progress->video_progress ?? 0,
+            'video_watched_completed' => $videoWatchedCompleted,
+            'video_questions_completed' => $videoQuestionsCompleted,
+            'final_video_completed' => $videoCompleted
+        ]);
+    }
+    
+    $finalResult = $attendanceCompleted && $fileCompleted && $videoCompleted;
+    
+    Log::info('Material Completion Final Check:', [
+        'material_id' => $material->id,
+        'user_id' => $progress->user_id,
+        'attendance_completed' => $attendanceCompleted,
+        'file_completed' => $fileCompleted,
+        'video_completed' => $videoCompleted,
+        'final_result' => $finalResult
+    ]);
+    
+    return $finalResult;
+}
+
+/**
+ * Cek apakah video dan pertanyaan sudah selesai
+ */
+private function isVideoAndQuestionsCompleted($userId, $materialId)
+{
+    $material = Materials::find($materialId);
+    if (!$material) {
+        Log::warning('Material not found', ['material_id' => $materialId]);
+        return false;
+    }
+    
+    $progress = MaterialProgress::where('user_id', $userId)
+        ->where('material_id', $materialId)
+        ->first();
+    
+    if (!$progress) {
+        Log::warning('Progress not found', [
+            'user_id' => $userId,
+            'material_id' => $materialId
+        ]);
+        return false;
+    }
+    
+    // VIDEO HARUS DITONTON 100%
+    $minWatchPercentage = 100; // UBAH DARI 90 KE 100
+    $videoProgress = $progress->video_progress ?? 0;
+    $videoWatched = ($videoProgress >= $minWatchPercentage);
+    
+    // Cek semua pertanyaan video terjawab
+    $totalQuestions = VideoQuestion::where('material_id', $materialId)->count();
+    $answeredQuestions = UserVideoQuestionAnswer::where('user_id', $userId)
+        ->where('material_id', $materialId)
+        ->count();
+    
+    $questionsAnswered = ($totalQuestions === 0) || ($answeredQuestions >= $totalQuestions);
+    
+    $result = $videoWatched && $questionsAnswered;
+    
+    Log::info('Video and Questions Completion Check:', [
+        'material_id' => $materialId,
+        'user_id' => $userId,
+        'video_progress' => $videoProgress,
+        'video_watched' => $videoWatched,
+        'total_questions' => $totalQuestions,
+        'answered_questions' => $answeredQuestions,
+        'questions_answered' => $questionsAnswered,
+        'final_result' => $result
+    ]);
+    
+    return $result;
+}
 
 
     /**
@@ -1174,63 +1513,6 @@ class KursusController extends Controller
         'progress' => $progress,
         'playerConfig' => $this->safeJsonDecode($materialRecord->player_config, [])
     ]);
-}
-
-public function saveVideoQuestionAnswer(Request $request, $kursus, $material)
-{
-    try {
-        $user = Auth::user();
-        
-        $request->validate([
-            'question_id' => 'required|exists:video_questions,id',
-            'answer' => 'required|integer',
-            'is_correct' => 'required|boolean',
-            'points' => 'required|integer|min:0'
-        ]);
-
-        // Simpan jawaban ke UserVideoProgress
-        $progress = UserVideoProgress::updateOrCreate(
-            [
-                'user_id' => $user->id,
-                'material_id' => $material,
-                'question_id' => $request->question_id
-            ],
-            [
-                'answer' => $request->answer,
-                'is_correct' => $request->is_correct,
-                'points_earned' => $request->points,
-                'answered_at' => now()
-            ]
-        );
-
-        // Update total points di MaterialProgress
-        $materialProgress = MaterialProgress::where('user_id', $user->id)
-            ->where('material_id', $material)
-            ->first();
-            
-        if ($materialProgress) {
-            $currentPoints = $materialProgress->video_question_points ?? 0;
-            $materialProgress->update([
-                'video_question_points' => $currentPoints + $request->points
-            ]);
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Jawaban tersimpan'
-        ]);
-
-    } catch (\Exception $e) {
-        Log::error('Error saving video question answer:', [
-            'error' => $e->getMessage(),
-            'question_id' => $request->question_id
-        ]);
-        
-        return response()->json([
-            'success' => false,
-            'message' => 'Gagal menyimpan jawaban'
-        ], 500);
-    }
 }
     /**
      * PERBAIKAN BESAR: Method prepareVideoData sesuai dengan admin controller
@@ -2046,85 +2328,339 @@ private function generateVideoToken($materialId, $userId)
         return null;
     }
 
-    public function updateVideoProgress(Request $request, $kursus, $material)
-    {
-        try {
-            $user = Auth::user();
-            
-            $request->validate([
-                'progress_percentage' => 'required|numeric|min:0|max:100',
-                'current_time' => 'required|numeric',
-                'duration' => 'required|numeric',
-            ]);
-            
-            // Cek apakah video sudah selesai berdasarkan persentase
-            $materialRecord = Materials::where('is_active', true)
-                ->where('id', $material)
-                ->first();
-            
-            if (!$materialRecord) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Material tidak ditemukan'
-                ], 404);
-            }
-            
-            // Update atau buat progress
-            $progress = MaterialProgress::where('user_id', $user->id)
-                ->where('material_id', $material)
-                ->first();
-            
-            // Get min watch percentage from player config
-            $minWatchPercentage = 90; // Default 90%
-            
-            $playerConfig = $this->safeJsonDecode($materialRecord->player_config, []);
-            
-            $isCompleted = $request->progress_percentage >= $minWatchPercentage;
-            
-            if ($progress) {
-                $progress->video_status = $isCompleted ? 'completed' : 'in_progress';
-                $progress->video_progress = $request->progress_percentage;
-                $progress->video_current_time = $request->current_time;
-                $progress->video_duration = $request->duration;
-                $progress->save();
-            } else {
-                $progress = MaterialProgress::create([
-                    'user_id' => $user->id,
-                    'material_id' => $material,
-                    'video_status' => $isCompleted ? 'completed' : 'in_progress',
-                    'video_progress' => $request->progress_percentage,
-                    'video_current_time' => $request->current_time,
-                    'video_duration' => $request->duration,
-                    'material_status' => 'pending',
-                    'attendance_status' => 'pending'
-                ]);
-            }
-            
-            // Jika video selesai, cek dan unlock material berikutnya
-            if ($isCompleted && $progress->video_status === 'completed') {
-                $this->checkAndUnlockNextMaterial($user->id, $material, $kursus);
-                $this->updateEnrollmentProgress($user->id, $kursus);
-            }
-            
-            return response()->json([
-                'success' => true,
-                'progress' => $progress,
-                'is_completed' => $isCompleted,
-            ]);
-            
-        } catch (\Exception $e) {
-            Log::error('Error updating video progress:', [
-                'error' => $e->getMessage(),
-                'user_id' => Auth::id(),
-                'material' => $material
-            ]);
-            
+    public function saveVideoQuestionAnswer(Request $request, $kursus, $material)
+{
+    try {
+        $user = Auth::user();
+        
+        $request->validate([
+            'question_id' => 'required',
+            'answer' => 'required|integer',
+            'is_correct' => 'required|boolean',
+            'points' => 'required|integer|min:0'
+        ]);
+
+        // Cari question
+        $question = VideoQuestion::find($request->question_id);
+        if (!$question) {
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal update progress video'
-            ], 500);
+                'message' => 'Pertanyaan tidak ditemukan'
+            ], 404);
         }
+
+        // Simpan jawaban
+        $answer = UserVideoQuestionAnswer::updateOrCreate(
+            [
+                'user_id' => $user->id,
+                'material_id' => $material,
+                'question_id' => $request->question_id
+            ],
+            [
+                'answer' => $request->answer,
+                'is_correct' => $request->is_correct,
+                'points_earned' => $request->points,
+                'answered_at' => now()
+            ]
+        );
+
+        // Update MaterialProgress
+        $materialProgress = MaterialProgress::where('user_id', $user->id)
+            ->where('material_id', $material)
+            ->first();
+            
+        if (!$materialProgress) {
+            $materialProgress = MaterialProgress::create([
+                'user_id' => $user->id,
+                'material_id' => $material,
+                'video_question_points' => $request->points,
+                'material_status' => 'pending',
+                'attendance_status' => 'pending',
+                'video_status' => 'in_progress',
+                'video_progress' => 0 // Default 0%
+            ]);
+        } else {
+            // Update total points
+            $totalPoints = UserVideoQuestionAnswer::where('user_id', $user->id)
+                ->where('material_id', $material)
+                ->sum('points_earned');
+            
+            $materialProgress->video_question_points = $totalPoints;
+            $materialProgress->save();
+        }
+
+        // Cek apakah video sudah 100% DAN semua pertanyaan terjawab
+        $isVideoAndQuestionsCompleted = $this->isVideoAndQuestionsCompleted($user->id, $material);
+        
+        if ($isVideoAndQuestionsCompleted) {
+            // Update video_status ke completed
+            if ($materialProgress) {
+                $materialProgress->video_status = 'completed';
+                $materialProgress->save();
+            }
+            
+            // Cek dan unlock material berikutnya
+            $this->checkAndUnlockNextMaterial($user->id, $material, $kursus);
+            
+            // Update enrollment progress
+            $this->updateEnrollmentProgress($user->id, $kursus);
+            
+            Log::info('Video questions answered and video 100% - material completed', [
+                'material_id' => $material,
+                'user_id' => $user->id
+            ]);
+        } else {
+            // Cek progress video saat ini
+            $videoProgress = $materialProgress->video_progress ?? 0;
+            Log::info('Video questions answered but video not 100% yet', [
+                'material_id' => $material,
+                'user_id' => $user->id,
+                'video_progress' => $videoProgress,
+                'questions_answered' => UserVideoQuestionAnswer::where('user_id', $user->id)
+                    ->where('material_id', $material)
+                    ->count(),
+                'total_questions' => VideoQuestion::where('material_id', $material)->count()
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Jawaban tersimpan',
+            'answer_id' => $answer->id,
+            'total_points' => $materialProgress->video_question_points ?? $request->points,
+            'answered_count' => UserVideoQuestionAnswer::where('user_id', $user->id)
+                ->where('material_id', $material)
+                ->count(),
+            'total_questions' => VideoQuestion::where('material_id', $material)->count(),
+            'is_video_and_questions_completed' => $isVideoAndQuestionsCompleted,
+            'video_progress' => $materialProgress->video_progress ?? 0
+        ]);
+
+    } catch (\Exception $e) {
+        Log::error('Error saving video question answer:', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+            'question_id' => $request->question_id ?? 'unknown'
+        ]);
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'Gagal menyimpan jawaban: ' . $e->getMessage()
+        ], 500);
     }
+}
+
+public function forceCompleteVideo(Request $request, $kursus, $material)
+{
+    try {
+        $user = Auth::user();
+        
+        Log::info('FORCE COMPLETE VIDEO REQUEST:', [
+            'user_id' => $user->id,
+            'material_id' => $material,
+            'data' => $request->all()
+        ]);
+        
+        // Cek enrollment
+        $enrollment = Enrollment::where('user_id', $user->id)
+            ->where('kursus_id', $kursus)
+            ->firstOrFail();
+        
+        // Cari atau buat progress
+        $progress = MaterialProgress::firstOrNew([
+            'user_id' => $user->id,
+            'material_id' => $material
+        ]);
+        
+        // FORCE SET KE 100%
+        $progress->video_progress = 100;
+        $progress->video_current_time = $request->video_duration ?? 0;
+        $progress->video_duration = $request->video_duration ?? 0;
+        $progress->video_status = 'completed';
+        $progress->save();
+        
+        // Cek apakah semua pertanyaan video sudah dijawab
+        $totalQuestions = VideoQuestion::where('material_id', $material)->count();
+        $answeredQuestions = UserVideoQuestionAnswer::where('user_id', $user->id)
+            ->where('material_id', $material)
+            ->count();
+        
+        $allQuestionsAnswered = ($totalQuestions === 0) || ($answeredQuestions >= $totalQuestions);
+        
+        Log::info('Force complete video result:', [
+            'material_id' => $material,
+            'user_id' => $user->id,
+            'video_progress' => 100,
+            'all_questions_answered' => $allQuestionsAnswered,
+            'answered' => $answeredQuestions,
+            'total' => $totalQuestions
+        ]);
+        
+        // Jika semua pertanyaan terjawab, unlock material berikutnya
+        if ($allQuestionsAnswered) {
+            $this->checkAndUnlockNextMaterial($user->id, $material, $kursus);
+            $this->updateEnrollmentProgress($user->id, $kursus);
+            
+            Log::info('Video 100% complete + all questions answered - unlocking next', [
+                'material_id' => $material,
+                'kursus_id' => $kursus
+            ]);
+        }
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Video telah diselesaikan 100%',
+            'video_progress' => 100,
+            'all_questions_answered' => $allQuestionsAnswered
+        ]);
+        
+    } catch (\Exception $e) {
+        Log::error('Error in forceCompleteVideo:', [
+            'error' => $e->getMessage(),
+            'user_id' => Auth::id(),
+            'material' => $material
+        ]);
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'Gagal menyelesaikan video: ' . $e->getMessage()
+        ], 500);
+    }
+}
+
+    public function updateVideoProgress(Request $request, $kursus, $material)
+{
+    try {
+        $user = Auth::user();
+        
+        $request->validate([
+            'progress_percentage' => 'required|numeric|min:0|max:100',
+            'current_time' => 'required|numeric',
+            'duration' => 'required|numeric',
+        ]);
+        
+        // Cek apakah video sudah selesai berdasarkan persentase
+        $materialRecord = Materials::where('is_active', true)
+            ->where('id', $material)
+            ->first();
+        
+        if (!$materialRecord) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Material tidak ditemukan'
+            ], 404);
+        }
+        
+        // Update atau buat progress
+        $progress = MaterialProgress::where('user_id', $user->id)
+            ->where('material_id', $material)
+            ->first();
+        
+        // VIDEO HARUS 100% - TIDAK ADA KOMPROMI
+        $minWatchPercentage = 100; // UBAH DARI 90 KE 100
+        
+        $videoWatchedCompleted = ($request->progress_percentage >= $minWatchPercentage);
+        
+        if ($progress) {
+            // Update progress video
+            $progress->video_progress = $request->progress_percentage;
+            $progress->video_current_time = $request->current_time;
+            $progress->video_duration = $request->duration;
+            
+            // Cek apakah video sudah 100% DAN semua pertanyaan terjawab
+            if ($videoWatchedCompleted) {
+                $totalQuestions = VideoQuestion::where('material_id', $material)->count();
+                $answeredQuestions = UserVideoQuestionAnswer::where('user_id', $user->id)
+                    ->where('material_id', $material)
+                    ->count();
+                
+                $allQuestionsAnswered = ($totalQuestions === 0) || ($answeredQuestions >= $totalQuestions);
+                
+                // Hanya tandai video_status sebagai completed jika BOTH conditions met
+                if ($allQuestionsAnswered) {
+                    $progress->video_status = 'completed';
+                    Log::info('Video marked as completed - 100% watched and all questions answered', [
+                        'material_id' => $material,
+                        'user_id' => $user->id,
+                        'video_progress' => $request->progress_percentage
+                    ]);
+                } else {
+                    // Jika video 100% tapi pertanyaan belum semua terjawab
+                    $progress->video_status = 'in_progress';
+                    Log::info('Video 100% but questions not all answered', [
+                        'material_id' => $material,
+                        'user_id' => $user->id,
+                        'answered' => $answeredQuestions,
+                        'total' => $totalQuestions
+                    ]);
+                }
+            } else {
+                // Video belum 100%
+                $progress->video_status = 'in_progress';
+            }
+            
+            $progress->save();
+        } else {
+            // Buat progress baru
+            $progress = MaterialProgress::create([
+                'user_id' => $user->id,
+                'material_id' => $material,
+                'video_status' => 'in_progress',
+                'video_progress' => $request->progress_percentage,
+                'video_current_time' => $request->current_time,
+                'video_duration' => $request->duration,
+                'material_status' => 'pending',
+                'attendance_status' => 'pending'
+            ]);
+        }
+        
+        // Cek apakah video sudah selesai 100% DAN semua pertanyaan terjawab
+        $isVideoAndQuestionsCompleted = $this->isVideoAndQuestionsCompleted($user->id, $material);
+        
+        if ($isVideoAndQuestionsCompleted) {
+            // Pastikan video_status ke completed
+            if ($progress && $progress->video_status !== 'completed') {
+                $progress->video_status = 'completed';
+                $progress->save();
+            }
+            
+            // Cek dan unlock material berikutnya
+            $this->checkAndUnlockNextMaterial($user->id, $material, $kursus);
+            
+            // Update enrollment progress
+            $this->updateEnrollmentProgress($user->id, $kursus);
+            
+            Log::info('Video and questions fully completed - unlocking next material', [
+                'material_id' => $material,
+                'user_id' => $user->id,
+                'kursus_id' => $kursus
+            ]);
+        }
+        
+        return response()->json([
+            'success' => true,
+            'progress' => $progress,
+            'video_watched_completed' => $videoWatchedCompleted,
+            'is_video_and_questions_completed' => $isVideoAndQuestionsCompleted,
+            'message' => $videoWatchedCompleted ? 
+                'Video telah ditonton 100%' : 
+                'Progress video: ' . $request->progress_percentage . '%'
+        ]);
+        
+    } catch (\Exception $e) {
+        Log::error('Error updating video progress:', [
+            'error' => $e->getMessage(),
+            'user_id' => Auth::id(),
+            'material' => $material,
+            'trace' => $e->getTraceAsString()
+        ]);
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'Gagal update progress video: ' . $e->getMessage()
+        ], 500);
+    }
+}
 
     // MARK: - Test Methods sesuai dengan admin controller
     public function showTest($kursus, $material, $testType)
@@ -2777,6 +3313,55 @@ private function generateVideoToken($materialId, $userId)
             ], 500);
         }
     }
+
+
+// Controller
+public function checkUnlock(Request $request, $kursus, $material)
+{
+    try {
+        $user = Auth::user();
+        
+        // Cek apakah material saat ini sudah selesai
+        $materialRecord = Materials::where('is_active', true)
+            ->where('id', $material)
+            ->where('course_id', $kursus)
+            ->firstOrFail();
+        
+        $progress = MaterialProgress::where('user_id', $user->id)
+            ->where('material_id', $material)
+            ->first();
+        
+        if (!$progress) {
+            return response()->json(['success' => false, 'message' => 'Progress tidak ditemukan']);
+        }
+        
+        $isCompleted = $this->isMaterialCompleted($progress, $materialRecord);
+        
+        if ($isCompleted) {
+            // Cari material berikutnya
+            $nextMaterial = Materials::where('course_id', $kursus)
+                ->where('is_active', true)
+                ->where('order', '>', $materialRecord->order)
+                ->orderBy('order')
+                ->first();
+            
+            if ($nextMaterial) {
+                return response()->json([
+                    'success' => true,
+                    'next_material_id' => $nextMaterial->id,
+                    'next_material_title' => $nextMaterial->title,
+                    'message' => 'Material berikutnya siap dibuka'
+                ]);
+            }
+        }
+        
+        return response()->json(['success' => false, 'message' => 'Belum bisa unlock material berikutnya']);
+        
+    } catch (\Exception $e) {
+        Log::error('Error checking unlock:', ['error' => $e->getMessage()]);
+        return response()->json(['success' => false, 'message' => 'Terjadi kesalahan']);
+    }
+}
 
 
             public function daftar($id)

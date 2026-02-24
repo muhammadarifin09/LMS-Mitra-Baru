@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
     <title>Laporan Mitra: {{ $mitra->nama }}</title>
     <style>        
         /* 1. PERBAIKAN UTAMA: Gunakan selector 'body' (bukan .body) */
         body {
-            font-family: "Arial", "Helvetica", sans-serif !important;
+            font-family: 'DejaVu Sans', sans-serif;
             font-size: 10pt;
             line-height: 1.2;
             color: #333;
@@ -16,7 +16,7 @@
 
         /* 2. Pastikan Tabel mewarisi font (DomPDF terkadang mereset font di dalam tabel) */
         table, tr, td, th, tbody, thead, tfoot {
-            font-family: "Arial", "Helvetica", sans-serif !important;
+            font-family: 'DejaVu Sans', sans-serif;
         }
         
         /* HEADER */
@@ -87,7 +87,7 @@
             display: block;
             margin-bottom: 2px;
             line-height: 1.1;
-            font-family: "Arial", "Helvetica", sans-serif !important; /* Tambahan force */
+            font-family: 'DejaVu Sans', sans-serif;
         }
         
         .info-value {
@@ -170,10 +170,10 @@
     <div class="header">
         <h1>LAPORAN BELAJAR MITRA</h1>
         <h2>{{ $mitra->nama }}</h2>
-        <?php
-            date_default_timezone_set('Asia/Jakarta');
-        ?>
-        <p>ID Sobat: {{ $mitra->biodata->id_sobat ?? '-' }} | Dicetak: {{ date('d F Y H:i') }} WIB</p>
+        <p>
+            ID Sobat: {{ $mitra->biodata->id_sobat ?? '-' }} |
+            Dicetak: {{ now('Asia/Jakarta')->format('d F Y H:i') }} WIB
+        </p>
     </div>
     
     <div class="info-section">
@@ -251,13 +251,13 @@
                 <td class="text-center">{{ $data['tanggal_daftar'] }}</td>
                 <td class="text-center">{{ $data['tanggal_selesai'] }}</td>
                 <td class="text-center">
-                    {{ $data['progress_percentage'] }}%
+                    {{ $rataProgress !== null ? round($rataProgress, 1) : 0 }}%
                 </td>
                 <td class="text-center">
                     {{ $data['completed_materials'] }}/{{ $data['total_materials'] }}
                 </td>
                 <td class="text-center">
-                    {{ $data['nilai'] }}
+                    {{ $data['nilai'] !== null ? round($data['nilai'], 2) : '-' }}
                 </td>
             </tr>
             @endforeach

@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Controllers\Admin;
-
+use App\Services\NilaiService;
 use App\Http\Controllers\Controller;
 use App\Models\Kursus;
 use App\Models\MaterialProgress;
@@ -17,6 +17,9 @@ use App\Models\Enrollment;
 use App\Models\M_User;
 use App\Models\LaporanMitra;
 use Illuminate\Http\Request;
+use App\Models\VideoQuestion;
+use App\Models\UserVideoQuestionAnswer;
+
 
 
 class LaporanController extends Controller
@@ -24,6 +27,13 @@ class LaporanController extends Controller
     // ======================
     // LIST KURSUS
     // ======================
+    protected $nilaiService;
+
+    public function __construct(NilaiService $nilaiService)
+{
+    $this->nilaiService = $nilaiService;
+}
+
 
     public function exportKursusCsv()
 {
@@ -106,11 +116,11 @@ public function exportKursusDetailCsv(Kursus $kursus)
         ? round(($completedMaterials / $totalMaterials) * 100)
         : 0;
 
-    $nilai = $this->hitungNilai($user->id, $kursus);
+    $nilai = $this->nilaiService->hitungNilai($user->id, $kursus);
 
     fputcsv($file, [
         $no++,
-        $user->nama ?? $user->name ?? '-',
+        $user->nama ?? $user->nama ?? '-',
         $user->username ?? $user->email ?? '-',
         $enrollment->created_at->format('d-m-Y'),
         $progress,
@@ -147,7 +157,7 @@ public function exportKursusDetailCsv(Kursus $kursus)
     $pesertaData = [];
     foreach ($kursus->enrollments as $enrollment) {
         $user = $enrollment->user;
-        $nilai = $this->hitungNilai($user->id, $kursus);
+        $nilai = $this->nilaiService->hitungNilai($user->id, $kursus);
         
         $totalMaterials = $kursus->materials->where('is_active', true)->count();
         $completedMaterials = $this->hitungMateriSelesai($user->id, $kursus);
@@ -211,51 +221,132 @@ public function exportKursusDetailCsv(Kursus $kursus)
     // ======================
     private function isMaterialCompleted($progress, $material)
     {
-        // Jika tidak ada progress, maka belum selesai
         if (!$progress) {
             return false;
         }
 
-        // For test materials
-        if ($material->type === 'pre_test') {
+        $contentTypes = $this->getContentTypes($material->learning_objectives);
+        $isPretest = in_array('pretest', $contentTypes);
+        $isPosttest = in_array('posttest', $contentTypes);
+        $isRecap = $material->type === 'recap';
+
+        // === TEST MATERIAL ===
+        if ($isPretest) {
             return $progress->pretest_score !== null;
-        } elseif ($material->type === 'post_test') {
+        }
+
+        if ($isPosttest) {
             return $progress->posttest_score !== null;
-        } elseif ($material->type === 'recap') {
+        }
+
+        if ($isRecap) {
             return true;
-        } else {
-            // Untuk material reguler
-            $hasVideo = !empty($material->video_url) || !empty($material->video_file);
-            $attendanceRequired = $material->attendance_required ?? true;
-            $hasMaterial = !empty($material->file_path);
-            
-            $attendanceCompleted = !$attendanceRequired || $progress->attendance_status === 'completed';
-            $videoCompleted = !$hasVideo || $progress->video_status === 'completed';
-            
-            // Cek material completion
-            $materialCompleted = true;
-            if ($hasMaterial) {
+        }
+
+        // === MATERIAL REGULER ===
+        $hasFile = in_array('file', $contentTypes);
+        $hasVideo = in_array('video', $contentTypes);
+        $hasAttendance = in_array('attendance', $contentTypes) || ($material->attendance_required ?? true);
+
+        // Attendance
+        $attendanceCompleted = !$hasAttendance || $progress->attendance_status === 'completed';
+
+        // File completion
+        $fileCompleted = true;
+        if ($hasFile && !empty($material->file_path)) {
+            $filePaths = $this->parseFilePath($material->file_path);
+            $totalFiles = count($filePaths);
+
+            if ($totalFiles > 0) {
                 if ($progress->all_files_downloaded) {
-                    $materialCompleted = true;
+                    $fileCompleted = true;
                 } else {
-                    $filePaths = json_decode($material->file_path, true);
-                    if (!is_array($filePaths)) {
-                        $filePaths = [$material->file_path];
-                    }
-                    $totalFiles = count($filePaths);
-                    
-                    $downloadedFiles = json_decode($progress->downloaded_files, true) ?? [];
-                    $materialCompleted = (count($downloadedFiles) >= $totalFiles);
+                    $downloadedFiles = $this->safeJsonDecode($progress->downloaded_files, []);
+                    $fileCompleted = count($downloadedFiles) >= $totalFiles;
                 }
             }
-            
-            if (!$materialCompleted && $progress->material_status === 'completed') {
-                $materialCompleted = true;
-            }
-            
-            return $attendanceCompleted && $materialCompleted && $videoCompleted;
         }
+
+        // === VIDEO WAJIB 100% ===
+        $videoCompleted = true;
+        if ($hasVideo) {
+            $videoWatchedCompleted = ($progress->video_progress ?? 0) >= 100;
+
+            // Video questions
+            $videoQuestionsCompleted = true;
+            if ($material->has_video_questions && $material->total_video_points > 0) {
+                $totalQuestions = $material->question_count
+                    ?? VideoQuestion::where('material_id', $material->id)->count();
+
+                $answeredQuestions = UserVideoQuestionAnswer::where('user_id', $progress->user_id)
+                    ->where('material_id', $material->id)
+                    ->count();
+
+                $videoQuestionsCompleted = $answeredQuestions >= $totalQuestions;
+            }
+
+            $videoCompleted = $videoWatchedCompleted && $videoQuestionsCompleted;
+        }
+
+        return $attendanceCompleted && $fileCompleted && $videoCompleted;
     }
+
+    private function getContentTypes($learningObjectives)
+{
+    if (empty($learningObjectives)) {
+        return [];
+    }
+
+    $contentTypes = [];
+
+    try {
+        $objectives = is_array($learningObjectives)
+            ? $learningObjectives
+            : json_decode($learningObjectives, true);
+
+        if (is_array($objectives)) {
+            foreach ($objectives as $objective) {
+                if (isset($objective['type'])) {
+                    $contentTypes[] = strtolower($objective['type']);
+                }
+            }
+        }
+    } catch (\Exception $e) {
+        return [];
+    }
+
+    return array_unique($contentTypes);
+}
+
+
+private function parseFilePath($filePath)
+{
+    if (empty($filePath)) {
+        return [];
+    }
+
+    $paths = json_decode($filePath, true);
+
+    if (json_last_error() === JSON_ERROR_NONE && is_array($paths)) {
+        return $paths;
+    }
+
+    return [$filePath];
+}
+
+private function safeJsonDecode($value, $default = [])
+{
+    if (empty($value)) {
+        return $default;
+    }
+
+    try {
+        $decoded = json_decode($value, true);
+        return json_last_error() === JSON_ERROR_NONE ? $decoded : $default;
+    } catch (\Exception $e) {
+        return $default;
+    }
+}
 
     // ======================
     // HITUNG NILAI
@@ -320,7 +411,7 @@ public function exportKursusPdfRingkas(Kursus $kursus)
     foreach ($kursus->enrollments as $enrollment) {
         $user = $enrollment->user;
         $progress = $this->hitungProgress($enrollment);
-        $nilai = $this->hitungNilai($user->id, $kursus);
+        $nilai = $this->nilaiService->hitungNilai($user->id, $kursus);
         
         $totalMaterials = $kursus->materials->where('is_active', true)->count();
         $completedMaterials = $this->hitungMateriSelesai($user->id, $kursus);
@@ -368,61 +459,58 @@ public function exportKursusPdfRingkas(Kursus $kursus)
     return $pdf->download($fileName);
 }
 
-     public function exportKursusPdfDetail(Kursus $kursus)
+    public function exportKursusPdfDetail(Kursus $kursus)
     {
         $kursus->load(['enrollments.user', 'materials']);
-        
-        // Hitung statistik lengkap (sama seperti detail view)
+
         $pesertaData = [];
         foreach ($kursus->enrollments as $enrollment) {
             $user = $enrollment->user;
-            $progress = $this->hitungProgress($enrollment);
-            $nilai = $this->hitungNilai($user->id, $kursus);
-            
+
             $totalMaterials = $kursus->materials->where('is_active', true)->count();
             $completedMaterials = $this->hitungMateriSelesai($user->id, $kursus);
-            $progressPercentage = $totalMaterials > 0 
-                ? round(($completedMaterials / $totalMaterials) * 100) 
+
+            $progressPercentage = $totalMaterials > 0
+                ? round(($completedMaterials / $totalMaterials) * 100)
                 : 0;
-            
+
             $pesertaData[] = [
                 'user' => $user,
                 'enrollment' => $enrollment,
                 'progress_percentage' => $progressPercentage,
                 'completed_materials' => $completedMaterials,
                 'total_materials' => $totalMaterials,
-                'nilai' => $nilai
+                'nilai' => $this->nilaiService->hitungNilai($user->id, $kursus),
             ];
         }
-        
+
         $totalProgress = collect($pesertaData)->avg('progress_percentage');
         $totalNilai = collect($pesertaData)->avg('nilai');
-        $pesertaSelesai = collect($pesertaData)->where('progress_percentage', 100)->count();
-        
+        $pesertaSelesai = collect($pesertaData)
+            ->where('progress_percentage', 100)
+            ->count();
+
+        $fileName = 'detail-kursus-' . Str::slug($kursus->judul_kursus) . '-' . date('Y-m-d') . '.pdf';
+
         $pdf = Pdf::loadView(
             'laporan.admin.kursus.pdf-detail',
             compact(
-                'kursus', 
-                'pesertaData', 
-                'totalProgress', 
-                'totalNilai', 
+                'kursus',
+                'pesertaData',
+                'totalProgress',
+                'totalNilai',
                 'pesertaSelesai'
             )
-        );
-        
-        $pdf->setPaper('A4', 'portrait');
-        $pdf->setOption('margin-top', 15);
-        $pdf->setOption('margin-right', 15);
-        $pdf->setOption('margin-bottom', 15);
-        $pdf->setOption('margin-left', 15);
-        $pdf->setOption('default-font', 'arial');
-        
-        $fileName = 'detail-kursus-' . Str::slug($kursus->judul_kursus) . '-' . date('Y-m-d') . '.pdf';
-        
+        )->setPaper('A4', 'portrait')
+        ->setOptions([
+            'defaultFont' => 'DejaVu Sans',
+            'isHtml5ParserEnabled' => true,
+            'isRemoteEnabled' => true,
+        ]);
+
         return $pdf->download($fileName);
     }
-
-
+    
     public function generateLaporanKursus(Kursus $kursus)
 {
     $kursus->load(['enrollments.user', 'materials']);
@@ -435,7 +523,8 @@ public function exportKursusPdfRingkas(Kursus $kursus)
 
     foreach ($kursus->enrollments as $enrollment) {
         $progress = $this->hitungProgress($enrollment);
-        $nilai = $this->hitungNilai($enrollment->user_id, $kursus);
+        $nilai = $this->nilaiService->hitungNilai($enrollment->user_id, $kursus);
+
 
         $totalProgress += $progress;
 
@@ -508,6 +597,8 @@ public function exportKursusPdfRingkas(Kursus $kursus)
             ->findOrFail($id);
 
         $kursusData = [];
+        $totalNilai = 0;
+        $jumlahNilai = 0;
         
         foreach ($mitra->enrollments as $enrollment) {
             $kursus = $enrollment->kursus;
@@ -519,10 +610,13 @@ public function exportKursusPdfRingkas(Kursus $kursus)
                 ? round(($completedMaterials / $totalMaterials) * 100) 
                 : 0;
             
-            // Hitung nilai hanya jika progress 100%
-            $nilai = $progress == 100 
-                ? $this->hitungNilai($mitra->id, $kursus)
-                : null;
+            // Nilai hanya jika progress 100%
+            $nilai = $this->nilaiService->hitungNilai($mitra->id, $kursus);
+
+            if ($nilai !== null) {
+                $totalNilai += $nilai;
+                $jumlahNilai++;
+            }
 
             $kursusData[] = [
                 'kursus' => $kursus,
@@ -537,7 +631,16 @@ public function exportKursusPdfRingkas(Kursus $kursus)
             ];
         }
 
-        return view('laporan.admin.mitra.detail', compact('mitra', 'kursusData'));
+        // ✅ RATA-RATA NILAI (SUMBER RESMI)
+        $rataNilai = $jumlahNilai > 0
+            ? round($totalNilai / $jumlahNilai, 2)
+            : null;
+
+        return view('laporan.admin.mitra.detail', compact(
+            'mitra',
+            'kursusData',
+            'rataNilai'
+        ));
     }
 
     // ======================
@@ -581,7 +684,7 @@ public function exportKursusPdfRingkas(Kursus $kursus)
                 fputcsv($file, [
                     $no++,
                     $user->biodata->id_sobat ?? '-',
-                    $user->nama,
+                    $user->biodata->nama_lengkap ?? '-',
                     $user->biodata->kecamatan ?? '-',
                     $user->biodata->desa ?? '-',
                     $user->enrollments_count
@@ -596,7 +699,7 @@ public function exportKursusPdfRingkas(Kursus $kursus)
 
     public function exportMitraDetailCsv(M_User $mitra)
     {
-        $filename = 'laporan-kursus-mitra-' . Str::slug($mitra->nama) . '.csv';
+        $filename = 'laporan-kursus-mitra-' . Str::slug($mitra->biodata->nama_lengkap) . '.csv';
 
         $headers = [
             "Content-Type" => "text/csv; charset=UTF-8",
@@ -632,9 +735,9 @@ public function exportKursusPdfRingkas(Kursus $kursus)
                     ? round(($completedMaterials / $totalMaterials) * 100) 
                     : 0;
                 
-                $nilai = $progressPercentage == 100 
-                    ? $this->hitungNilai($mitra->id, $kursus)
-                    : '-';
+                $nilai = $progressPercentage == 100
+                ? $this->nilaiService->hitungNilai($mitra->id, $kursus)
+                : '-';
                 
                 fputcsv($file, [
                     $no++,
@@ -671,9 +774,9 @@ public function exportKursusPdfRingkas(Kursus $kursus)
                 ? round(($completedMaterials / $totalMaterials) * 100) 
                 : 0;
             
-            $nilai = $progressPercentage == 100 
-                ? $this->hitungNilai($mitra->id, $kursus)
-                : null;
+            $nilai = $progressPercentage == 100
+            ? $this->nilaiService->hitungNilai($mitra->id, $kursus)
+            : null;
 
             $kursusData[] = [
                 'kursus' => $kursus,
@@ -695,6 +798,8 @@ public function exportKursusPdfRingkas(Kursus $kursus)
         $nilaiData = collect($kursusData)->where('nilai', '!=', null)->pluck('nilai');
         $rataNilai = $nilaiData->count() > 0 ? $nilaiData->avg() : null;
 
+        $fileName = 'laporan-mitra-' . Str::slug($mitra->nama) . '-' . date('Y-m-d') . '.pdf';
+
         $pdf = Pdf::loadView(
             'laporan.admin.mitra.pdf-detail',
             compact(
@@ -705,21 +810,17 @@ public function exportKursusPdfRingkas(Kursus $kursus)
                 'rataProgress',
                 'rataNilai'
             )
-        );
-        
-        $pdf->setPaper('A4', 'portrait');
-        $pdf->setOption('margin-top', 15);
-        $pdf->setOption('margin-right', 15);
-        $pdf->setOption('margin-bottom', 15);
-        $pdf->setOption('margin-left', 15);
-        $pdf->setOption('default-font', 'arial');
-        
-        $fileName = 'laporan-mitra-' . Str::slug($mitra->nama) . '-' . date('Y-m-d') . '.pdf';
-        
+        )->setPaper('A4', 'portrait')
+        ->setOptions([
+            'defaultFont' => 'DejaVu Sans',
+            'isHtml5ParserEnabled' => true,
+            'isRemoteEnabled' => true,
+        ]);
+
         return $pdf->download($fileName);
     }
 
-        public function generateLaporanMitra(M_User $mitra)
+    public function generateLaporanMitra(M_User $mitra)
     {
         $mitra->load(['biodata', 'enrollments.kursus.materials']);
         
@@ -746,7 +847,7 @@ public function exportKursusPdfRingkas(Kursus $kursus)
             if ($progress == 100) {
                 $kursusSelesai++;
                 
-                $nilai = $this->hitungNilai($mitra->id, $kursus);
+                $nilai = $this->nilaiService->hitungNilai($mitra->id, $kursus);
                 if ($nilai !== null) {
                     $totalNilai += $nilai;
                     $jumlahNilai++;

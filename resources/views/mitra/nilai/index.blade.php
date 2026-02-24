@@ -736,7 +736,7 @@ document.addEventListener('DOMContentLoaded', function() {
         showAlert('danger', '{{ session('error') }}');
     @endif
     
-   async function exportToPDF() {
+async function exportToPDF() {
     // Pastikan jsPDF sudah terload
     if (typeof window.jspdf === 'undefined') {
         throw new Error('jsPDF belum terload. Silakan refresh halaman.');
@@ -748,77 +748,155 @@ document.addEventListener('DOMContentLoaded', function() {
     // Get mitra data from hidden element
     const mitraData = document.getElementById('mitraData');
     const namaMitra = mitraData ? mitraData.getAttribute('data-nama') : 'Mitra';
+    const totalKursus = mitraData ? mitraData.getAttribute('data-total') : 0;
+    const lulusCount = mitraData ? mitraData.getAttribute('data-lulus') : 0;
     
     // Page dimensions
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
-    const margin = 15;
+    const margin = 20;
+    let yPos = 25; // Starting Y position
+    
+    // Warna dari gambar (biru tua)
+    const primaryColor = [33, 82, 155]; // Warna biru tua dari gambar
     
     // ==================== HEADER ====================
-    // Logo/Title - TAMPIL DI TENGAH
-    doc.setFontSize(20);
-    doc.setTextColor(41, 128, 185);
-    doc.setFont(undefined, 'bold');
+    // Background header biru
+    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.rect(0, 0, pageWidth, 35, 'F');
     
-    // Hitung posisi tengah untuk judul
-    const title1 = 'LAPORAN NILAI KURSUS';
-    const title1Width = doc.getTextWidth(title1);
-    const title1X = (pageWidth - title1Width) / 2;
-    doc.text(title1, title1X, 25);
+    // Judul utama dengan warna putih di atas background biru
+    doc.setFontSize(18);
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
     
-    doc.setFontSize(14);
-    doc.setTextColor(100, 100, 100);
-    doc.setFont(undefined, 'normal');
+    const mainTitle = 'Laporan Nilai Hasil Kursus Mitra';
+    const mainTitleWidth = doc.getTextWidth(mainTitle);
+    doc.text(mainTitle, (pageWidth - mainTitleWidth) / 2, 22);
     
-    const title2 = 'SISTEM PEMBELAJARAN ONLINE';
-    const title2Width = doc.getTextWidth(title2);
-    const title2X = (pageWidth - title2Width) / 2;
-    doc.text(title2, title2X, 35);
+    // Subtitle dengan warna putih terang
+    doc.setFontSize(11);
+    doc.setTextColor(220, 220, 220);
+    doc.setFont('helvetica', 'normal');
     
-    // Line separator
-    doc.setDrawColor(200, 200, 200);
-    doc.line(margin, 42, pageWidth - margin, 42);
+    const subtitle = 'MOOC BPS Kabupaten Tanah Laut';
+    const subtitleWidth = doc.getTextWidth(subtitle);
+    doc.text(subtitle, (pageWidth - subtitleWidth) / 2, 30);
     
-    // ==================== MITRA INFO ====================
-    const infoY = 50;
+    yPos = 45;
     
-    doc.setFontSize(14);
-    doc.setTextColor(60, 60, 60);
-    doc.setFont(undefined, 'bold');
-    doc.text('INFORMASI MITRA', margin, infoY);
-    
-    // Nama mitra
+    // ==================== INFO MITRA ====================
+    // Judul info mitra
     doc.setFontSize(12);
-    doc.setFont(undefined, 'normal');
-    doc.text('Nama: ' + namaMitra, margin + 5, infoY + 10);
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setFont('helvetica', 'bold');
+    doc.text('INFORMASI MITRA', margin, yPos);
     
-    // Tanggal cetak
+    // Garis bawah judul
+    doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setLineWidth(0.5);
+    doc.line(margin, yPos + 2, margin + 60, yPos + 2);
+    
+    yPos += 10;
+    
+    // Informasi mitra dalam tabel sederhana tanpa border box
+    doc.setFontSize(10);
+    doc.setTextColor(60, 60, 60);
+    doc.setFont('helvetica', 'normal');
+    
+    // Baris 1: Nama Mitra
+    doc.text('Nama Mitra', margin, yPos);
+    doc.setFont('helvetica', 'bold');
+    doc.text(namaMitra, margin + 30, yPos);
+    
+    // Status
+    doc.setFont('helvetica', 'normal');
+    doc.text('Status', margin + 90, yPos);
+    doc.setFont('helvetica', 'bold');
+    
+    // Tentukan status
+    let statusMitra = 'Aktif';
+    if (lulusCount > 0 && totalKursus > 0) {
+        const persentaseLulus = (lulusCount / totalKursus) * 100;
+        if (persentaseLulus >= 80) {
+            statusMitra = 'Sangat Baik';
+        } else if (persentaseLulus >= 60) {
+            statusMitra = 'Baik';
+        } else {
+            statusMitra = 'Perlu Perbaikan';
+        }
+    }
+    doc.text(statusMitra, margin + 120, yPos);
+    
+    yPos += 8;
+    
+    // Baris 2: Tanggal Cetak
     const currentDate = new Date().toLocaleDateString('id-ID', {
+        weekday: 'long',
         day: 'numeric',
         month: 'long',
         year: 'numeric'
     });
-    doc.text('Tanggal Cetak: ' + currentDate, margin + 5, infoY + 18);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Tanggal Cetak', margin, yPos);
+    doc.setFont('helvetica', 'bold');
+    doc.text(currentDate, margin + 30, yPos);
     
-    // ==================== TABLE DETAIL NILAI ====================
-    const tableStartY = infoY + 35;
+    // Total Kursus
+    doc.setFont('helvetica', 'normal');
+    doc.text('Total Kursus', margin + 90, yPos);
+    doc.setFont('helvetica', 'bold');
+    doc.text(totalKursus.toString(), margin + 120, yPos);
     
-    doc.setFontSize(16);
-    doc.setTextColor(60, 60, 60);
-    doc.setFont(undefined, 'bold');
+    yPos += 15;
     
-    // Judul tabel di tengah
-    const tableTitle = 'DAFTAR NILAI KURSUS';
-    const tableTitleWidth = doc.getTextWidth(tableTitle);
-    const tableTitleX = (pageWidth - tableTitleWidth) / 2;
-    doc.text(tableTitle, tableTitleX, tableStartY);
+    // Garis pemisah
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.line(margin, yPos, pageWidth - margin, yPos);
+    
+    yPos += 10;
+    
+    // ==================== TABEL NILAI ====================
+    // Judul tabel
+    doc.setFontSize(14);
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setFont('helvetica', 'bold');
+    doc.text('DAFTAR NILAI KURSUS', margin, yPos);
+    
+    // Garis bawah judul tabel
+    doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setLineWidth(0.5);
+    doc.line(margin, yPos + 2, margin + 80, yPos + 2);
+    
+    yPos += 8;
     
     // Prepare table data
     const headers = [['NO', 'NAMA KURSUS', 'NILAI', 'STATUS']];
     const rows = [];
     
+    // Hitung rata-rata nilai untuk nanti
+    let totalNilai = 0;
+    let countNilai = 0;
+    
     // Convert PHP data for PDF
     @foreach($nilai as $index => $n)
+        let statusText = '';
+        
+        @if($n['status'] === 'lulus')
+            statusText = 'LULUS';
+        @elseif($n['status'] === 'tidak_lulus')
+            statusText = 'TIDAK LULUS';
+        @else
+            statusText = 'BELUM DINILAI';
+        @endif
+        
+        // Hitung untuk rata-rata
+        @if(isset($n['nilai']) && $n['nilai'] !== null)
+            totalNilai += {{ $n['nilai'] }};
+            countNilai++;
+        @endif
+        
         rows.push([
             '{{ $index + 1 }}',
             '{{ $n['kursus']->judul_kursus }}',
@@ -827,97 +905,121 @@ document.addEventListener('DOMContentLoaded', function() {
             @else
                 '-'
             @endif,
-            @if($n['status'] === 'lulus')
-                'LULUS'
-            @elseif($n['status'] === 'tidak_lulus')
-                'TIDAK LULUS'
-            @else
-                'BELUM DINILAI'
-            @endif
+            statusText
         ]);
     @endforeach
     
-    // Create table
+    // Create table dengan style sederhana
     doc.autoTable({
         head: headers,
         body: rows,
-        startY: tableStartY + 10,
-        margin: { 
-            left: margin, 
-            right: margin
-        },
+        startY: yPos,
+        margin: { left: margin, right: margin },
         theme: 'grid',
         headStyles: { 
-            fillColor: [41, 128, 185], 
+            fillColor: primaryColor,
             textColor: 255,
             fontSize: 10,
             fontStyle: 'bold',
-            halign: 'center'
+            halign: 'center',
+            cellPadding: 6,
+            lineColor: [200, 200, 200],
+            lineWidth: 0.3
         },
         bodyStyles: { 
-            fontSize: 11,
-            textColor: [60, 60, 60],
-            cellPadding: 5
-        },
-        alternateRowStyles: {
-            fillColor: [248, 248, 248]
+            fontSize: 12,
+            textColor: [60, 60, 60], // Semua teks dalam tabel berwarna hitam
+            cellPadding: 5,
+            lineColor: [200, 200, 200],
+            lineWidth: 0.3
         },
         columnStyles: {
             0: { 
-                cellWidth: 15, 
+                cellWidth: 19, 
                 halign: 'center',
                 fontStyle: 'bold'
             },
             1: { 
                 cellWidth: 'auto',
-                halign: 'left'
+                halign: 'left',
+                cellPadding: { left: 10, right: 10, top: 5, bottom: 5 }
             },
             2: { 
                 cellWidth: 25, 
-                halign: 'center'
+                halign: 'center',
+                fontStyle: 'bold',
+                textColor: [60, 60, 60] // Warna hitam untuk nilai
             },
             3: { 
-                cellWidth: 35, 
+                cellWidth: 30, 
                 halign: 'center',
-                fontStyle: 'bold'
+                fontStyle: 'bold',
+                textColor: [60, 60, 60] // Warna hitam untuk status
             }
         },
         styles: {
             overflow: 'linebreak',
-            cellPadding: 5,
             lineColor: [200, 200, 200],
-            lineWidth: 0.1
+            lineWidth: 0.3,
+            textColor: [60, 60, 60] // Default warna hitam untuk semua
         },
         didDrawPage: function(data) {
             // Footer
             const pageCount = doc.internal.getNumberOfPages();
+            const footerY = doc.internal.pageSize.height - 15;
             
-            doc.setFontSize(9);
+            // Footer line
+            doc.setDrawColor(200, 200, 200);
+            doc.setLineWidth(0.3);
+            doc.line(margin, footerY - 5, pageWidth - margin, footerY - 5);
+            
+            // Informasi sistem di kiri
+            doc.setFontSize(8);
             doc.setTextColor(120, 120, 120);
+            doc.text(
+                'MOOC BPS Kabupaten Tanah Laut',
+                margin,
+                footerY
+            );
             
-            // Page number - di tengah
+            // Page number di kanan
             doc.text(
                 `Halaman ${data.pageNumber} dari ${pageCount}`,
+                pageWidth - margin,
+                footerY,
+                { align: 'right' }
+            );
+            
+            // Copyright di tengah bawah
+            doc.setFontSize(7);
+            doc.text(
+                '© ' + new Date().getFullYear() + ' - Dokumen ini dicetak otomatis dari sistem',
                 pageWidth / 2,
-                pageHeight - 10,
+                footerY + 6,
                 { align: 'center' }
             );
             
-            // Tambahkan informasi mitra di footer setiap halaman (kecuali halaman pertama)
+            // Watermark untuk halaman tambahan
             if (data.pageNumber > 1) {
-                doc.setFontSize(8);
-                doc.setTextColor(150, 150, 150);
+                doc.setFontSize(12);
+                doc.setTextColor(230, 230, 230);
+                doc.setFont('helvetica', 'bold');
                 doc.text(
-                    `Mitra: ${namaMitra} | ${currentDate}`,
+                    'Laporan Nilai',
                     pageWidth / 2,
-                    pageHeight - 20,
+                    pageHeight / 2,
+                    { align: 'center' }
+                );
+                
+                doc.setFontSize(10);
+                doc.text(
+                    namaMitra,
+                    pageWidth / 2,
+                    pageHeight / 2 + 8,
                     { align: 'center' }
                 );
             }
-        },
-        // Menambahkan border untuk tabel yang lebih rapi
-        tableLineColor: [200, 200, 200],
-        tableLineWidth: 0.1
+        }
     });
     
     // ==================== SAVE PDF ====================
@@ -927,7 +1029,8 @@ document.addEventListener('DOMContentLoaded', function() {
         .replace(/\s+/g, '_')
         .toLowerCase();
     
-    const fileName = `laporan_nilai_${cleanName}.pdf`;
+    const timestamp = new Date().toISOString().slice(0,10).replace(/-/g, '');
+    const fileName = `laporan_nilai_${cleanName}_${timestamp}.pdf`;
     
     // Save PDF
     doc.save(fileName);

@@ -10,13 +10,14 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\KursusController;
 use App\Http\Controllers\Admin\BiodataController;
 use App\Http\Controllers\Admin\MaterialController;
-use App\Http\Controllers\Admin\DashboardController; // TAMBAHKAN INI
+use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Mitra\BerandaController;
 use App\Http\Controllers\Mitra\KursusController as MitraKursusController;
-use App\Http\Controllers\Mitra\DashboardController as MitraDashboardController; // GUNAKAN ALIAS
+use App\Http\Controllers\Mitra\DashboardController as MitraDashboardController;
 use App\Http\Controllers\Mitra\CertificateController;
+use App\Http\Controllers\Admin\LaporanController;
 
 // Login
 Route::get('/', fn() => view('login'))->name('login.page');
@@ -72,6 +73,7 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
             
             // NEW: Drag and Drop Routes
             Route::post('materials/update-order', [MaterialController::class, 'updateOrder'])->name('update-order');
+            Route::post('materials/bulk-destroy', [MaterialController::class, 'bulkDestroy'])->name('bulk-destroy'); // Nama route akan menjadi: admin.kursus.materials.bulk-destroy
             Route::get('materials/{material}/progress-stats', [MaterialController::class, 'getProgressStats'])->name('progress-stats');
             
             // Video Related Routes
@@ -106,7 +108,7 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     });
 });
 
-// Routes untuk Mitra
+// Routes untuk Mitra - DIPERBAIKI DENGAN SEMUA ROUTE VIDEO
 Route::middleware(['auth', 'role:mitra'])->group(function () {
     // Route tanpa prefix (untuk kompatibilitas)
     Route::get('/beranda', [BerandaController::class, 'index'])->name('mitra.beranda');
@@ -123,72 +125,107 @@ Route::middleware(['auth', 'role:mitra'])->group(function () {
         // Route untuk myCourses (alternatif)
         Route::get('/my-courses', [MitraKursusController::class, 'myCourses'])->name('kursus.my');
         
-        // Material Routes untuk Mitra
+        // ============================================
+        // VIDEO & PROGRESS ROUTES - FIXED VERSION
+        // ============================================
         Route::prefix('kursus/{kursus}')->group(function () {
-            // Download File
+            // 1. Save video question answer - ROUTE YANG PERNAH HILANG
+            Route::post('/material/{material}/save-video-question', [MitraKursusController::class, 'saveVideoQuestionAnswer'])
+                ->name('kursus.material.save.video.question');
+            
+            // 2. Mark video as completed - ROUTE YANG PERNAH HILANG
+            Route::post('/materials/{material}/complete-video', [MitraKursusController::class, 'completeVideo'])
+                ->name('kursus.material.video.complete');
+            
+            // 3. Get material status (API)
+            Route::get('/materials/{material}/status', [MitraKursusController::class, 'getMaterialStatus'])
+                ->name('kursus.material.status');
+
+            Route::post('/materials/{material}/force-complete-video', [MitraKursusController::class, 'forceCompleteVideo'])
+                ->name('kursus.material.video.force-complete');
+            
+            // 4. Get progress
+            Route::get('/progress', [MitraKursusController::class, 'getProgress'])
+                ->name('kursus.progress');
+            
+            // 5. Refresh all materials status
+            Route::get('/materials/refresh-all-status', [MitraKursusController::class, 'refreshAllMaterialsStatus'])
+                ->name('kursus.materials.refresh-all-status');
+            
+            // 6. Get subtasks
+            Route::get('/materials/{material}/subtasks', [MitraKursusController::class, 'getMaterialSubtasks'])
+                ->name('kursus.material.subtasks');
+            
+            // 7. Refresh single material status
+            Route::get('/materials/{material}/refresh-status', [MitraKursusController::class, 'refreshMaterialStatus'])
+                ->name('kursus.material.refresh-status');
+            
+            // 8. Complete material (non-video)
+            Route::post('/materials/{material}/complete', [MitraKursusController::class, 'completeMaterial'])
+                ->name('kursus.material.complete');
+            
+            // 9. Attendance
+            Route::post('/materials/{material}/attendance', [MitraKursusController::class, 'markAttendance'])
+                ->name('kursus.material.attendance');
+            
+            // 10. Download material file
             Route::get('/materials/{material}/download', [MitraKursusController::class, 'downloadMaterialFile'])
                 ->name('kursus.material.download');
             
-            // Show material files (optional)
-            Route::get('/materials/{material}/files', [MitraKursusController::class, 'showMaterialFiles'])
-                ->name('kursus.material.files');
+            // 11. Video view
+            Route::get('/materials/{material}/video', [MitraKursusController::class, 'viewMaterialVideo'])
+                ->name('kursus.material.video');
             
-            // Test Routes
+            // 12. Video stream
+            Route::get('/materials/{material}/video/stream/{token}', [MitraKursusController::class, 'streamVideo'])
+                ->name('kursus.material.video.stream');
+            
+            // 13. Video progress update
+            Route::post('/materials/{material}/video/progress', [MitraKursusController::class, 'updateVideoProgress'])
+                ->name('kursus.material.video.progress');
+            
+            // 14. Mark video as watched
+            Route::post('/materials/{material}/video/watched', [MitraKursusController::class, 'recordVideoWatched'])
+                ->name('kursus.material.video.watched');
+            
+            // 15. Get video info
+            Route::get('/materials/{material}/video-info', [MitraKursusController::class, 'getVideoInfo'])
+                ->name('kursus.material.video.info');
+
+            Route::post('/materials/{material}/check-unlock', [MitraKursusController::class, 'checkUnlock'])
+                ->name('kursus.material.check-unlock');
+            
+            // 16. Test Routes
             Route::get('/test/{material}/{testType}', [MitraKursusController::class, 'showTest'])
                 ->name('kursus.test.show');
             Route::post('/test/{material}/{testType}/submit', [MitraKursusController::class, 'submitTest'])
                 ->name('kursus.test.submit');
             
-            // Recap Routes
+            // 17. Recap Routes
             Route::get('/recap/{material}', [MitraKursusController::class, 'showRecap'])
                 ->name('kursus.recap.show');
             
-            // Route attendance
-            Route::post('/materials/{material}/attendance', [MitraKursusController::class, 'markAttendance'])
-                ->name('kursus.material.attendance');
+            // 18. Show material files (optional)
+            Route::get('/materials/{material}/files', [MitraKursusController::class, 'showMaterialFiles'])
+                ->name('kursus.material.files');
             
-            // Route untuk complete material
-            Route::post('/materials/{material}/complete', [MitraKursusController::class, 'completeMaterial'])
-                ->name('kursus.material.complete');
-
-            Route::get('/materials/{material}/refresh-status', [MitraKursusController::class, 'refreshMaterialStatus'])
-                ->name('kursus.material.refresh-status');
-    
-            // Route untuk get status semua material setelah update
-            Route::get('/materials/refresh-all-status', [MitraKursusController::class, 'refreshAllMaterialsStatus'])
-                ->name('kursus.materials.refresh-all-status');
+            // 19. Quick fix video (debug)
+            Route::get('/materials/{material}/quick-fix-video', [MitraKursusController::class, 'quickFixVideo'])
+                ->name('kursus.material.quick.fix.video');
             
-            // Route untuk subtasks
-            Route::get('/materials/{material}/subtasks', [MitraKursusController::class, 'getMaterialSubtasks'])
-                ->name('kursus.material.subtasks');
-            
-            // API untuk real-time progress
-            Route::get('/progress', [MitraKursusController::class, 'getProgress'])
-                ->name('kursus.progress');
-            
-            // ============================
-            // VIDEO ROUTES - FIXED
-            // ============================
-            
-            // Route untuk menampilkan video player
-            Route::get('/materials/{material}/video', [MitraKursusController::class, 'viewMaterialVideo'])
-                ->name('kursus.material.video');
-            
-            // Route untuk streaming video lokal
-            Route::get('/materials/{material}/video/stream/{token}', [MitraKursusController::class, 'streamVideo'])
-                ->name('kursus.material.video.stream');
-            
-            // Route untuk video progress tracking
-            Route::post('/materials/{material}/video/complete', [MitraKursusController::class, 'markVideoAsComplete'])
-                ->name('kursus.material.video.complete');
-            
-            Route::post('/materials/{material}/video/progress', [MitraKursusController::class, 'updateVideoProgress'])
-                ->name('kursus.material.video.progress');
-            
-            // Route untuk menandai video sudah ditonton
-            Route::post('/materials/{material}/video/watched', [MitraKursusController::class, 'markVideoAsWatched'])
-                ->name('kursus.material.video.watched');
+            // 20. Update enrollment progress
+            Route::post('/refresh-progress', function($kursus) {
+                $controller = app()->make(MitraKursusController::class);
+                return $controller->updateEnrollmentProgress(auth()->id(), $kursus);
+            })->name('kursus.refresh.progress');
         });
+        
+        // Debug routes (optional)
+        Route::get('/debug/material/{material}/video', [MitraKursusController::class, 'debugMaterialVideo'])
+            ->name('debug.material.video');
+            
+        Route::post('/fix-material-videos', [MitraKursusController::class, 'fixMaterialVideos'])
+            ->name('fix.material.videos');
     });
 });
 
@@ -200,9 +237,7 @@ Route::middleware(['auth'])->prefix('profil')->group(function () {
     Route::delete('/hapus-foto', [ProfilController::class, 'hapusFoto'])->name('profil.hapus-foto');
 });
 
-use App\Http\Controllers\Admin\LaporanController;
-use Barryvdh\DomPDF\Facade\Pdf;
-
+// Laporan Routes
 Route::prefix('admin')
     ->name('admin.')
     ->middleware(['auth', 'role:admin'])
@@ -299,8 +334,7 @@ Route::prefix('admin/laporan')->name('admin.laporan.')->group(function () {
         ->name('mitra.detail');
 });
 
-Route::get('/test-csv', [\App\Http\Controllers\Admin\LaporanController::class, 'exportKursusCsv']);
-Route::get('/test-csv', [\App\Http\Controllers\Admin\LaporanController::class, 'exportKursusCsv'])
+Route::get('/test-csv', [LaporanController::class, 'exportKursusCsv'])
     ->name('test.csv');
 Route::post(
     '/admin/laporan/kursus/{kursus}/generate',
@@ -312,29 +346,17 @@ Route::post(
 )->name('admin.laporan.mitra.generate');
 
 // Sertifikat Routes
-
 Route::middleware(['auth'])->prefix('sertifikat')->name('sertifikat.')->group(function () {
     Route::get('/', [CertificateController::class, 'index'])->name('index');
-    Route::get('/{certificate}', [CertificateController::class, 'show'])->name('show');
     Route::get('/{certificate}/unduh', [CertificateController::class, 'download'])->name('download');
 });
-
-// Route::middleware(['auth'])->prefix('certificates')->group(function () {
-//     Route::get('/', [CertificateController::class, 'index'])->name('index');
-//     Route::get('/{certificate}', [CertificateController::class, 'show'])->name('show');
-//     Route::get('/{certificate}/unduh', [CertificateController::class, 'download'])->name('download');
-//     Route::get('/{certificate}/preview', [CertificateController::class, 'preview'])->name('preview');
-//     Route::get('/kursus/{kursus}/cek', [CertificateController::class, 'checkCertificate'])->name('check');
-// });
 
 Route::middleware(['auth'])->prefix('dashboard/sertifikat')->name('sertifikat.')->group(function () {
     Route::get('/', [CertificateController::class, 'index'])->name('index');
-    Route::get('/{certificate}', [CertificateController::class, 'show'])->name('show');
     Route::get('/{certificate}/unduh', [CertificateController::class, 'download'])->name('download');
 });
 
-
-// routes/web.php (tambahkan di bawah)
+// Test certificate QR
 Route::get('/test-certificate-qr', function () {
     $certificate = \App\Models\Certificate::with(['user', 'kursus', 'enrollment'])
         ->whereNotNull('id_kredensial')
@@ -353,13 +375,14 @@ Route::get('/test-certificate-qr', function () {
 });
 
 // Validasi sertifikat via QR code
-Route::get('/sertifikat/{id_kredensial}', [App\Http\Controllers\Mitra\CertificateController::class, 'validateCertificate'])
+Route::get('/sertifikat/{id_kredensial}', [CertificateController::class, 'validateCertificate'])
     ->name('certificates.validate');
     
 Route::get('/sertifikat/{id_kredensial}/pdf', 
-    [App\Http\Controllers\Mitra\CertificateController::class, 'publicPdf']
+    [CertificateController::class, 'publicPdf']
 )->name('certificates.publicPdf');
 
+// Nilai Routes
 Route::middleware(['auth', 'role:mitra'])
     ->prefix('mitra')
     ->name('mitra.')
@@ -371,3 +394,28 @@ Route::middleware(['auth', 'role:mitra'])
             ->name('nilai.simpan');
     });
 
+
+// Route::get(
+//     '/admin/kursus/{kursus}/pdf-detail',
+//     [\App\Http\Controllers\Admin\KursusPdfController::class, 'detail']
+// )->name('admin.kursus.pdf.detail');
+
+
+
+// Test routes untuk video functionality
+if (app()->environment('local')) {
+    Route::get('/test-video-routes', function() {
+        $routes = [
+            'saveVideoQuestionAnswer' => route('mitra.kursus.material.save.video.question', ['kursus' => 1, 'material' => 1]),
+            'completeVideo' => route('mitra.kursus.material.video.complete', ['kursus' => 1, 'material' => 1]),
+            'getMaterialStatus' => route('mitra.kursus.material.status', ['kursus' => 1, 'material' => 1]),
+            'getProgress' => route('mitra.kursus.progress', ['kursus' => 1]),
+            'viewMaterialVideo' => route('mitra.kursus.material.video', ['kursus' => 1, 'material' => 1]),
+        ];
+        
+        return response()->json([
+            'message' => 'Video routes are properly configured',
+            'routes' => $routes
+        ]);
+    });
+}

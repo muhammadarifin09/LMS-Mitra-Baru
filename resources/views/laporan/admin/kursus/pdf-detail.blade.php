@@ -13,7 +13,7 @@
         }
         
         body {
-            font-family: 'DejaVu Sans', Arial, sans-serif;
+            font-family: 'DejaVu Sans', sans-serif;
             font-size: 10px;
             line-height: 1.4;
             color: #000;
@@ -29,9 +29,10 @@
         }
 
         .header-container {
-            display: flex;
+            /* display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: space-between; */
+            text-align: center;
             margin-bottom: 5px;
             padding-bottom: 8px;
             border-bottom: 2px solid #1f3c88; /* Biru BPS */
@@ -103,10 +104,10 @@
         
         /* ===== STATS GRID ===== */
         .stats-grid {
-            display: grid;
+            /* display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 12px;
-            margin-bottom: 20px;
+            margin-bottom: 20px; */
         }
         
         .stat-item {
@@ -184,35 +185,12 @@
         }
         
         /* ===== PROGRESS BAR ===== */
-        .progress-container {
-            height: 14px;
-            background-color: #e9ecef;
-            border-radius: 7px;
-            overflow: hidden;
-            position: relative;
-            margin: 2px 0;
-        }
-        
-        .progress-bar {
-            height: 100%;
-            border-radius: 7px;
-            transition: width 0.3s ease;
-        }
-        
+        .progress-container,
+        .progress-bar,
         .progress-text {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 8px;
-            font-weight: 600;
-            color: white;
-            text-shadow: 0 0 1px rgba(0,0,0,0.5);
+            /* DISABLE progress bar for DomPDF */
         }
+
         
         /* Warna progress */
         .progress-0-49 { background-color: #002d4dff; }
@@ -297,7 +275,7 @@
         .font-weight-bold { font-weight: 700; }
         
         /* ===== PRINT OPTIMIZATION ===== */
-        @media print {
+        /* @media print {
             body {
                 font-size: 12pt;
                 margin: 12px 30px;
@@ -321,25 +299,19 @@
                 width: 100%;
                 background: white;
             }
-        }
+        } */
         
         /* ===== WATERMARK ===== */
-        .watermark {
-            position: fixed;
-            bottom: 30px;
-            right: 20px;
-            opacity: 0.05;
-            font-size: 60px;
-            color: #1f3c88; /* Biru BPS */
-            transform: rotate(-45deg);
-            pointer-events: none;
-            z-index: -1;
+                .watermark {
+            /* position: fixed; */
+            display: none;
         }
+
     </style>
 </head>
 <body>
     <!-- Watermark -->
-    <div class="watermark">MOOC BPS</div>
+    <!-- <div class="watermark">MOOC BPS</div> -->
     
     <!-- Header -->
     <div class="header">

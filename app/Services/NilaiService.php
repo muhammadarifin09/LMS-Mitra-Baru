@@ -3,36 +3,77 @@
 namespace App\Services;
 
 use App\Models\MaterialProgress;
+use App\Models\UserVideoQuestionAnswer;
 use App\Models\Kursus;
 
 class NilaiService
 {
     public function hitungNilai($userId, Kursus $kursus)
-    {
-        $materialIds = $kursus->materials->pluck('id');
+{
+    $materialIds = $kursus->materials->pluck('id');
 
-        $progress = MaterialProgress::where('user_id', $userId)
-            ->whereIn('material_id', $materialIds)
-            ->get();
+    /* =====================
+       PRETEST
+       ===================== */
+    $nilaiPretest = MaterialProgress::where('user_id', $userId)
+        ->whereIn('material_id', $materialIds)
+        ->whereNotNull('pretest_score')
+        ->avg('pretest_score');
 
-        $totalScore = 0;
-        $totalTest = 0;
+    /* =====================
+       POSTTEST
+       ===================== */
+    $nilaiPosttest = MaterialProgress::where('user_id', $userId)
+        ->whereIn('material_id', $materialIds)
+        ->whereNotNull('posttest_score')
+        ->avg('posttest_score');
 
-        foreach ($progress as $p) {
-            if ($p->pretest_score !== null) {
-                $totalScore += $p->pretest_score;
-                $totalTest++;
-            }
-            if ($p->posttest_score !== null) {
-                $totalScore += $p->posttest_score;
-                $totalTest++;
-            }
-        }
+    /* =====================
+       VIDEO (CEK USER SUDAH JAWAB SOAL)
+       ===================== */
+   /* =====================
+   VIDEO (HITUNG BERDASARKAN JUMLAH SOAL)
+   ===================== */
+    $videoAnswers = UserVideoQuestionAnswer::where('user_id', $userId)
+        ->whereHas('question', function ($q) use ($materialIds) {
+            $q->whereIn('material_id', $materialIds);
+        })
+        ->get();
 
-        return $totalTest > 0
-            ? round($totalScore / $totalTest, 2)
-            : null;
+    if ($videoAnswers->isEmpty()) {
+        $nilaiVideo = null;
+    } else {
+        $totalPointUser = $videoAnswers->sum('points_earned');
+
+        // asumsi setiap soal bernilai maksimal 100
+        $totalPointMax = $videoAnswers->count() * 100;
+
+        $nilaiVideo = ($totalPointUser / $totalPointMax) * 100;
     }
+
+
+    /* =====================
+       KUMPULKAN NILAI YANG ADA
+       ===================== */
+    $nilaiList = collect([
+        $nilaiPretest,
+        $nilaiPosttest,
+        $nilaiVideo,
+    ])->filter(fn ($v) => $v !== null);
+
+    /* =====================
+       BELUM ADA APA-APA
+       ===================== */
+    if ($nilaiList->isEmpty()) {
+        return null; // ➜ "Belum ada nilai"
+    }
+
+    /* =====================
+       RATA-RATA SAMA RATA
+       ===================== */
+    return round($nilaiList->avg(), 2);
+}
+
 
     public function statusNilai(?float $nilai): string
     {

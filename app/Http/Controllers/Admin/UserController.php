@@ -11,11 +11,32 @@ use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
 {
-    public function index()
-    {
-        $users = M_User::with('biodata')->get();
-        return view('admin.users.index', ['users' => $users]);
+    public function index(Request $request)
+{
+    $query = M_User::with('biodata');
+    
+    // Search filter
+    if ($request->has('search') && $request->search != '') {
+        $search = $request->search;
+        $query->where(function($q) use ($search) {
+            $q->where('nama', 'LIKE', "%{$search}%")
+              ->orWhere('username', 'LIKE', "%{$search}%");
+        });
     }
+    
+    // Role filter
+    if ($request->has('role') && $request->role != '') {
+        $query->where('role', $request->role);
+    }
+    
+    // Per page selection
+    $perPage = $request->input('per_page', 10);
+    
+    // Paginate with query parameters
+    $users = $query->paginate($perPage)->appends($request->except('page'));
+    
+    return view('admin.users.index', ['users' => $users]);
+}
 
     public function create()
     {

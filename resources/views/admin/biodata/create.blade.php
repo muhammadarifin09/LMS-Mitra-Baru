@@ -1,6 +1,6 @@
 @extends('layouts.admin')
 
-@section('title', 'MOOC BPS - Tambah Biodata Mitra')
+@section('title', 'MOOC BPS - Tambah Biodata Peserta')
 
 @section('styles')
 <style>
@@ -259,16 +259,16 @@
 @section('content')
 <!-- Welcome Section -->
 <div class="welcome-section">
-    <h1 class="welcome-title">Tambah Biodata Mitra</h1>
+    <h1 class="welcome-title">Tambah Biodata Peserta</h1>
     <p class="welcome-subtitle">
-        Tambahkan data biodata mitra BPS baru. Pastikan semua data diisi dengan benar.
+        Tambahkan data biodata peserta MOOC baru. Pastikan semua data diisi dengan benar.
     </p>
 </div>
 
 <!-- Form Section -->
 <div class="form-container">
     <div class="form-header">
-        <h2 class="form-title">Form Tambah Biodata Mitra</h2>
+        <h2 class="form-title">Form Tambah Biodata Peserta</h2>
     </div>
     
     <div class="form-content">
@@ -296,7 +296,7 @@
             <!-- Data untuk User & Login -->
             <div class="form-section">
                 <h3 class="section-title">
-                    <i class="fas fa-user-lock me-2"></i>Data Login Mitra
+                    <i class="fas fa-user-lock me-2"></i>Data Login Peserta
                 </h3>
                 
                 <div class="row">
@@ -304,14 +304,14 @@
                         <div class="form-group">
                             <label class="form-label">ID Sobat *</label>
                             <input type="text" name="id_sobat" class="form-control" placeholder="Contoh: 630122090056" value="{{ old('id_sobat') }}" required>
-                            <div class="form-help">ID Sobat akan menjadi password default untuk login mitra</div>
+                            <div class="form-help">ID Sobat akan menjadi password default untuk login peserta</div>
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="form-group">
                             <label class="form-label">Email/Username *</label>
-                            <input type="email" name="username_sobat" class="form-control" placeholder="Contoh: mitra@example.com" value="{{ old('username_sobat') }}" required>
-                            <div class="form-help">Email akan menjadi username untuk login mitra</div>
+                            <input type="email" name="username_sobat" class="form-control" placeholder="Contoh: peserta@example.com" value="{{ old('username_sobat') }}" required>
+                            <div class="form-help">Email akan menjadi username untuk login peserta</div>
                         </div>
                     </div>
                 </div>
@@ -327,13 +327,13 @@
                     <div class="col-md-6">
                         <div class="form-group">
                             <label class="form-label">Nama Lengkap *</label>
-                            <input type="text" name="nama_lengkap" class="form-control" placeholder="Nama Lengkap Mitra" value="{{ old('nama_lengkap') }}" required>
+                            <input type="text" name="nama_lengkap" class="form-control" placeholder="Nama Lengkap Peserta" value="{{ old('nama_lengkap') }}" required>
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="form-group">
-                            <label class="form-label">Tempat, Tanggal Lahir (Umur)</label>
-                            <input type="text" name="tempat_tanggal_lahir" class="form-control" placeholder="Contoh: TANAH LAUT, 04 Juli 2002 (24)" value="{{ old('tempat_tanggal_lahir') }}">
+                            <label class="form-label">Tempat, Tanggal Lahir (Umur) *</label>
+                            <input type="text" name="tempat_tanggal_lahir" class="form-control" placeholder="Contoh: TANAH LAUT, 04 Juli 2002 (24)" value="{{ old('tempat_tanggal_lahir') }}" required>
                         </div>
                     </div>
                 </div>
@@ -347,8 +347,8 @@
                     </div>
                     <div class="col-md-6">
                         <div class="form-group">
-                            <label class="form-label">Jenis Kelamin</label>
-                            <select name="jenis_kelamin" class="form-select">
+                            <label class="form-label">Jenis Kelamin *</label>
+                            <select name="jenis_kelamin" class="form-select" required>
                                 <option value="">-- Pilih --</option>
                                 <option value="Laki-laki">Laki-laki</option>
                                 <option value="Perempuan">Perempuan</option>
@@ -360,14 +360,14 @@
                 <div class="row">
                     <div class="col-md-6">
                         <div class="form-group">
-                            <label class="form-label">Provinsi</label>
-                            <input type="text" name="alamat_prov" class="form-control" placeholder="Masukkan Kode Kecamatan" value="{{ old('alamat_prov') }}">
+                            <label class="form-label">Provinsi *</label>
+                            <input type="text" name="alamat_prov" class="form-control" placeholder="Masukkan Kode Kecamatan" value="{{ old('alamat_prov') }}" required>
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="form-group">
-                            <label class="form-label">Kabupaten/Kota</label>
-                            <input type="text" name="alamat_kab" class="form-control" placeholder="Masukkan Kode Kabupaten/Kota" value="{{ old('alamat_kab') }}">
+                            <label class="form-label">Kabupaten/Kota *</label>
+                            <input type="text" name="alamat_kab" class="form-control" placeholder="Masukkan Kode Kabupaten/Kota" value="{{ old('alamat_kab') }}" required>
                         </div>
                     </div>
                 </div>
@@ -395,8 +395,8 @@
                 <div class="row">
                     <div class="col-md-6">
                         <div class="form-group">
-                            <label class="form-label">Pendidikan Terakhir</label>
-                            <select name="pendidikan" class="form-control">
+                            <label class="form-label">Pendidikan Terakhir *</label>
+                            <select name="pendidikan" class="form-control" required>
                                 <option value="">-- Pilih Pendidikan --</option>
                                 <option value="Tamat SD/Sederajat" {{ old('pendidikan')=='Tamat SD/Sederajat' ? 'selected' : '' }}>
                                     Tamat SD / Sederajat
@@ -421,8 +421,8 @@
                     </div>
                     <div class="col-md-6">
                         <div class="form-group">
-                            <label class="form-label">Pekerjaan</label>
-                            <select name="pekerjaan" class="form-select">
+                            <label class="form-label">Pekerjaan *</label>
+                            <select name="pekerjaan" class="form-select" required>
                                 <option value="">-- Pilih Pekerjaan --</option>
                                 <option value="Pelajar / Mahasiswa" {{ old('pekerjaan') == 'Pelajar / Mahasiswa' ? 'selected' : '' }}>Pelajar / Mahasiswa</option>
                                 <option value="Wiraswasta" {{ old('pekerjaan') == 'Wiraswasta' ? 'selected' : '' }}>Wiraswasta</option>
@@ -446,14 +446,14 @@
                 <div class="row">
                     <div class="col-md-6">
                         <div class="form-group">
-                            <label class="form-label">Posisi</label>
-                            <input type="text" name="posisi" class="form-control" value="{{ old('posisi') }}">
+                            <label class="form-label">Posisi *</label>
+                            <input type="text" name="posisi" class="form-control" value="{{ old('posisi') }}" required>
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="form-group">
-                            <label class="form-label">Posisi Daftar</label>
-                            <input type="text" name="posisi_daftar" class="form-control" value="{{ old('posisi_daftar') }}">
+                            <label class="form-label">Posisi Daftar *</label>
+                            <input type="text" name="posisi_daftar" class="form-control" value="{{ old('posisi_daftar') }}" required>
                         </div>
                     </div>
                 </div>
@@ -484,7 +484,7 @@
                 </a>
                 <button type="submit" class="btn-submit">
                     <i class="fas fa-save"></i>
-                    Simpan Biodata Mitra
+                    Simpan Biodata Peserta
                 </button>
             </div>
         </form>

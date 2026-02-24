@@ -2020,8 +2020,8 @@ function addVideoQuestion() {
             <div class="col-md-6">
                 <label class="form-label">Poin</label>
                 <input type="number" class="form-control" name="video_questions[${questionId}][points]" 
-                       min="1" max="10" value="1">
-                <small class="text-muted">Poin untuk jawaban benar (1-10)</small>
+                       min="10" max="100" value="1">
+                <small class="text-muted">Poin untuk jawaban benar (10-100)</small>
             </div>
         </div>
         
@@ -2807,4 +2807,4 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
-@endsection
+@endsection 

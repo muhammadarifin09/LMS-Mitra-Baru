@@ -3,6 +3,8 @@
 @section('title', 'Manajemen User - MOOC BPS')
 
 @section('styles')
+<!-- SweetAlert CSS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
 <style>
     .table-container {
         background: white;
@@ -56,6 +58,7 @@
         margin: 0;
         border-collapse: separate;
         border-spacing: 0;
+        width: 100%;
     }
     
     .table thead th {
@@ -130,6 +133,13 @@
         transform: none;
     }
     
+    .badge {
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    
     .badge-admin {
         background: #dc3545;
         color: white;
@@ -162,15 +172,187 @@
         color: #dee2e6;
     }
     
-    .pagination-container {
-        background: #f8f9fa;
-        padding: 20px;
-        border-top: 1px solid #e9ecef;
+    .empty-state h4 {
+        margin-bottom: 10px;
+        color: #495057;
     }
     
-    .page-info {
-        color: #6c757d;
+    /* Pagination Styles - Sama dengan Biodata */
+    .pagination-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px 25px;
+        border-top: 1px solid #e9ecef;
+        background: #f8f9fa;
+    }
+    
+    .pagination-info {
         font-size: 0.9rem;
+        color: #6c757d;
+    }
+    
+    .pagination-controls {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+    
+    .per-page-selector {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .per-page-selector label {
+        font-size: 0.9rem;
+        color: #495057;
+        margin: 0;
+    }
+    
+    .per-page-selector select {
+        padding: 5px 10px;
+        border: 1px solid #ced4da;
+        border-radius: 5px;
+        background: white;
+        font-size: 0.9rem;
+        color: #495057;
+        cursor: pointer;
+    }
+    
+    .per-page-selector select:focus {
+        outline: none;
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+    
+    .pagination {
+        margin: 0;
+        display: flex;
+        gap: 5px;
+    }
+    
+    .page-item .page-link {
+        border-radius: 5px;
+        padding: 6px 12px;
+        border: 1px solid #dee2e6;
+        color: #1e3c72;
+        font-size: 0.9rem;
+        transition: all 0.2s;
+        text-decoration: none;
+    }
+    
+    .page-item.active .page-link {
+        background: linear-gradient(135deg, #1e3c72, #2a5298);
+        border-color: #1e3c72;
+        color: white;
+    }
+    
+    .page-item.disabled .page-link {
+        color: #6c757d;
+        background-color: #f8f9fa;
+        border-color: #dee2e6;
+    }
+    
+    .page-item .page-link:hover {
+        background-color: #e9ecef;
+        border-color: #dee2e6;
+    }
+    
+    .page-item.active .page-link:hover {
+        background: linear-gradient(135deg, #1e3c72, #2a5298);
+        color: white;
+    }
+    
+    /* Filter Section - Tetap seperti semula */
+    .filter-section {
+        padding: 15px 25px;
+        border-bottom: 1px solid #e9ecef;
+        background: #f8f9fa;
+    }
+    
+    .filter-container {
+        display: flex;
+        gap: 15px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    
+    .search-box {
+        position: relative;
+        flex: 1;
+        max-width: 300px;
+    }
+    
+    .search-box input {
+        width: 100%;
+        padding: 10px 15px 10px 40px;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        font-size: 0.9rem;
+    }
+    
+    .search-box i {
+        position: absolute;
+        left: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6c757d;
+    }
+    
+    .filter-select {
+        padding: 10px 15px;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        background: white;
+        font-size: 0.9rem;
+        color: #495057;
+    }
+    
+    /* Per Page Selector - Tetap di filter section */
+    .per-page-container {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-left: auto;
+    }
+    
+    .per-page-selector select {
+        padding: 8px 15px;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        background: white;
+        font-size: 0.85rem;
+        color: #495057;
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+        .pagination-container {
+            flex-direction: column;
+            gap: 15px;
+            align-items: flex-start;
+        }
+        
+        .pagination-controls {
+            width: 100%;
+            justify-content: space-between;
+        }
+        
+        .pagination {
+            flex-wrap: wrap;
+        }
+        
+        .filter-container {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        
+        .per-page-container {
+            margin-left: 0;
+            width: 100%;
+            justify-content: flex-start;
+        }
     }
 </style>
 @endsection
@@ -193,6 +375,36 @@
             Tambah User
         </a>
     </div>
+
+    <!-- FILTER SECTION -->
+    <div class="filter-section">
+        <form method="GET" action="{{ route('admin.users.index') }}" id="filterForm">
+            <div class="filter-container">
+                <!-- Search Input -->
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" name="search" placeholder="Cari nama atau username..." 
+                           value="{{ request('search') }}" class="search-input">
+                </div>
+
+                <!-- Role Filter -->
+                <select name="role" class="filter-select" onchange="document.getElementById('filterForm').submit()">
+                    <option value="">Semua Role</option>
+                    <option value="admin" {{ request('role') == 'admin' ? 'selected' : '' }}>Admin</option>
+                    <option value="mitra" {{ request('role') == 'mitra' ? 'selected' : '' }}>Mitra</option>
+                    <option value="instruktur" {{ request('role') == 'instruktur' ? 'selected' : '' }}>Instruktur</option>
+                    <option value="moderator" {{ request('role') == 'moderator' ? 'selected' : '' }}>Moderator</option>
+                </select>
+
+                <!-- Reset Filter -->
+                @if(request('search') || request('role'))
+                    <a href="{{ route('admin.users.index') }}" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-times"></i> Reset
+                    </a>
+                @endif
+            </div>
+        </form>
+    </div>
     
     <div class="table-responsive">
         <table class="table">
@@ -210,7 +422,7 @@
                 @if(isset($users) && $users->count() > 0)
                     @foreach($users as $index => $user)
                     <tr>
-                        <td>{{ $index + 1 }}</td>
+                        <td>{{ ($users->currentPage() - 1) * $users->perPage() + $loop->iteration }}</td>
                         <td>{{ $user->nama ?? $user->name }}</td>
                         <td>{{ $user->username ?? $user->email }}</td>
                         <td>********</td>
@@ -248,7 +460,7 @@
                                     </button>
                                 @else
                                     {{-- User lain - aktif (biodata tidak ikut terhapus) --}}
-                                    <form action="{{ route('admin.users.destroy', $user->id) }}" method="POST" class="d-inline">
+                                    <form action="{{ route('admin.users.destroy', $user->id) }}" method="POST" class="d-inline delete-form">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="btn-action btn-delete" title="Hapus" >
@@ -266,10 +478,16 @@
                             <div class="empty-state">
                                 <i class="fas fa-database"></i>
                                 <h4>Belum ada data user</h4>
-                                <p>Silakan tambah user baru untuk memulai</p>
+                                <p>
+                                    @if(request('search') || request('role'))
+                                        Tidak ada user yang sesuai dengan filter pencarian
+                                    @else
+                                        Silakan tambah user baru untuk memulai
+                                    @endif
+                                </p>
                                 <a href="{{ route('admin.users.create') }}" class="btn-tambah mt-3">
                                     <i class="fas fa-plus-circle"></i>
-                                    Tambah User Pertama
+                                    Tambah User
                                 </a>
                             </div>
                         </td>
@@ -279,18 +497,73 @@
         </table>
     </div>
 
-    {{-- PAGINATION --}}
-    @if(isset($users) && method_exists($users, 'hasPages') && $users->hasPages())
+    <!-- PAGINATION SECTION - SAMA DENGAN BIODATA -->
+    @if($users->count() > 0)
     <div class="pagination-container">
-        <div class="d-flex justify-content-between align-items-center">
-            <div class="page-info">
-                @if($users->total() > 0)
-                    Menampilkan {{ $users->firstItem() }} - {{ $users->lastItem() }} dari {{ $users->total() }} user
-                @else
-                    Tidak ada data user
-                @endif
+
+        <!-- Info -->
+        <div class="pagination-info">
+            Menampilkan {{ $users->firstItem() }} – {{ $users->lastItem() }}
+            dari {{ $users->total() }} data
+        </div>
+
+        <div class="pagination-controls">
+
+            <!-- Per Page -->
+            <div class="per-page-selector">
+                <label>Per halaman:</label>
+                <select onchange="changePerPage(this.value)">
+                    <option value="5" {{ $users->perPage() == 5 ? 'selected' : '' }}>5</option>
+                    <option value="10" {{ $users->perPage() == 10 ? 'selected' : '' }}>10</option>
+                    <option value="25" {{ $users->perPage() == 25 ? 'selected' : '' }}>25</option>
+                    <option value="50" {{ $users->perPage() == 50 ? 'selected' : '' }}>50</option>
+                    <option value="100" {{ $users->perPage() == 100 ? 'selected' : '' }}>100</option>
+                </select>
             </div>
-            {{ $users->links() }}
+
+            <!-- Pagination -->
+            <nav>
+                <ul class="pagination">
+
+                    @php
+                        $current = $users->currentPage();
+                        $last = $users->lastPage();
+
+                        $prev = max($current - 1, 1);
+                        $next = min($current + 1, $last);
+                    @endphp
+
+                    <!-- First Page -->
+                    <li class="page-item {{ $current == 1 ? 'disabled' : '' }}">
+                        <a class="page-link" href="{{ $users->url(1) }}{{ request()->getQueryString() ? '&' . http_build_query(request()->except(['page'])) : '' }}">«</a>
+                    </li>
+
+                    <!-- Previous Number -->
+                    @if($current > 1)
+                        <li class="page-item">
+                            <a class="page-link" href="{{ $users->url($prev) }}{{ request()->getQueryString() ? '&' . http_build_query(request()->except(['page'])) : '' }}">{{ $prev }}</a>
+                        </li>
+                    @endif
+
+                    <!-- Current -->
+                    <li class="page-item active">
+                        <span class="page-link">{{ $current }}</span>
+                    </li>
+
+                    <!-- Next Number -->
+                    @if($current < $last)
+                        <li class="page-item">
+                            <a class="page-link" href="{{ $users->url($next) }}{{ request()->getQueryString() ? '&' . http_build_query(request()->except(['page'])) : '' }}">{{ $next }}</a>
+                        </li>
+                    @endif
+
+                    <!-- Last Page -->
+                    <li class="page-item {{ $current == $last ? 'disabled' : '' }}">
+                        <a class="page-link" href="{{ $users->url($last) }}{{ request()->getQueryString() ? '&' . http_build_query(request()->except(['page'])) : '' }}">»</a>
+                    </li>
+
+                </ul>
+            </nav>
         </div>
     </div>
     @endif
@@ -298,19 +571,14 @@
 @endsection
 
 @section('scripts')
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // SweetAlert for delete confirmation
-        document.querySelectorAll('.btn-delete').forEach(button => {
-            button.addEventListener('click', function(e) {
-                // Skip if button is disabled
-                if (this.disabled) {
-                    e.preventDefault();
-                    return false;
-                }
-                
+        document.querySelectorAll('.delete-form').forEach(form => {
+            form.addEventListener('submit', function(e) {
                 e.preventDefault();
-                const form = this.closest('form');
                 const userName = this.closest('tr').querySelector('td:nth-child(2)').textContent;
                 
                 Swal.fire({
@@ -326,30 +594,31 @@
                     cancelButtonText: 'Batal'
                 }).then((result) => {
                     if (result.isConfirmed) {
-                        form.submit();
+                        this.submit();
                     }
                 });
             });
         });
 
-        // Search functionality (jika ada input search)
+        // Debounce search input
+        let searchTimeout;
         const searchInput = document.querySelector('.search-input');
         if (searchInput) {
-            const tableRows = document.querySelectorAll('tbody tr');
-            
             searchInput.addEventListener('input', function() {
-                const searchTerm = this.value.toLowerCase();
-                
-                tableRows.forEach(row => {
-                    const text = row.textContent.toLowerCase();
-                    if (text.includes(searchTerm)) {
-                        row.style.display = '';
-                    } else {
-                        row.style.display = 'none';
-                    }
-                });
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    document.getElementById('filterForm').submit();
+                }, 500);
             });
         }
+
+        // Fungsi untuk mengubah jumlah data per halaman
+        window.changePerPage = function(value) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('per_page', value);
+            url.searchParams.set('page', 1); // reset ke page 1
+            window.location.href = url.toString();
+        };
     });
 </script>
 @endsection

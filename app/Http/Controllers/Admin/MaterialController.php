@@ -17,6 +17,7 @@ use Google\Service\Drive as GoogleDrive;
 use Illuminate\Support\Facades\File;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Imports\SoalImport;
+use FFMpeg\FFProbe;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -28,62 +29,255 @@ use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
 
 class MaterialController extends Controller
 {
-    public function index(Kursus $kursus)
+    // File: app/Http/Controllers/Admin/MaterialController.php
+
+public function index(Kursus $kursus, Request $request)
 {
-    $materials = $kursus->materials()->orderBy('order')->get();
+    // Tambahkan parameter request untuk menerima query string
     
-    // Decode JSON fields untuk setiap material
-    $materials->each(function ($material) {
-        // Decode soal_pretest jika ada
-        if (!empty($material->soal_pretest)) {
-            try {
+    // Tambahkan konfigurasi per page
+    $perPage = $request->get('per_page', 10);
+    
+    // Query materials dengan pagination
+    $materialsQuery = $kursus->materials()->orderBy('order');
+    
+    // Jika ada filter/search, bisa ditambahkan di sini
+    if ($request->has('search')) {
+        $search = $request->get('search');
+        $materialsQuery->where(function($query) use ($search) {
+            $query->where('title', 'like', '%' . $search . '%')
+                  ->orWhere('description', 'like', '%' . $search . '%');
+        });
+    }
+    
+    // Filter berdasarkan status
+    if ($request->has('status')) {
+        $status = $request->get('status');
+        if ($status === 'active') {
+            $materialsQuery->where('is_active', true);
+        } elseif ($status === 'inactive') {
+            $materialsQuery->where('is_active', false);
+        }
+    }
+    
+    // Filter berdasarkan type
+    if ($request->has('type')) {
+        $type = $request->get('type');
+        if (in_array($type, ['material', 'pre_test', 'post_test'])) {
+            $materialsQuery->where('type', $type);
+        }
+    }
+    
+    $materials = $materialsQuery->paginate($perPage);
+    
+    // Load progress data untuk semua materials sekaligus
+    $materialIds = $materials->pluck('id')->toArray();
+    
+    // Ambil semua progress sekaligus untuk performa yang lebih baik
+    $allProgress = MaterialProgress::whereIn('material_id', $materialIds)
+        ->select('material_id', 'material_status', 'video_status')
+        ->get()
+        ->groupBy('material_id');
+    
+    // Ambil semua peserta yang enroll
+    $totalPeserta = $kursus->enrollments->count();
+    
+    $materials->each(function ($material) use ($allProgress, $totalPeserta) {
+        // Ambil progress untuk material ini
+        $progressData = $allProgress->get($material->id) ?? collect();
+        
+        // ============================================
+        // STATISTIK YANG SESUAI DENGAN DATABASE
+        // ============================================
+        
+        // 1. STATISTIK DOWNLOAD (material_status)
+        $jumlahDownload = $progressData->where('material_status', 'completed')->count();
+        
+        // 2. STATISTIK VIDEO (video_status)
+        $jumlahTonton = $progressData->where('video_status', 'completed')->count();
+        
+        // 3. STATISTIK ATTENDANCE
+        $jumlahHadir = 0;
+        if ($material->attendance_required) {
+            if ($progressData->first() && property_exists($progressData->first(), 'attendance_status')) {
+                $jumlahHadir = $progressData->where('attendance_status', 'completed')->count();
+            } else {
+                $jumlahHadir = max($jumlahDownload, $jumlahTonton);
+            }
+        }
+        
+        // 4. STATISTIK TEST (pretest dan posttest)
+        $jumlahPretest = $progressData->whereNotNull('pretest_score')->count();
+        $jumlahPosttest = $progressData->whereNotNull('posttest_score')->count();
+        
+        $pretestLulus = $progressData->filter(function($progress) use ($material) {
+            return isset($progress->pretest_score) && 
+                   $progress->pretest_score >= ($material->passing_grade ?? 70);
+        })->count();
+        
+        $posttestLulus = $progressData->filter(function($progress) use ($material) {
+            return isset($progress->posttest_score) && 
+                   $progress->posttest_score >= ($material->passing_grade ?? 70);
+        })->count();
+        
+        // 5. Hitung persentase
+        $persentaseHadir = $totalPeserta > 0 ? round(($jumlahHadir / $totalPeserta) * 100) : 0;
+        $persentaseDownload = $totalPeserta > 0 ? round(($jumlahDownload / $totalPeserta) * 100) : 0;
+        $persentaseTonton = $totalPeserta > 0 ? round(($jumlahTonton / $totalPeserta) * 100) : 0;
+        $persentasePretest = $totalPeserta > 0 ? round(($jumlahPretest / $totalPeserta) * 100) : 0;
+        $persentasePosttest = $totalPeserta > 0 ? round(($jumlahPosttest / $totalPeserta) * 100) : 0;
+        
+        // 6. Rata-rata nilai
+        $rataRataPretest = $progressData->whereNotNull('pretest_score')->avg('pretest_score');
+        $rataRataPosttest = $progressData->whereNotNull('posttest_score')->avg('posttest_score');
+        
+        // ============================================
+        // SIMPAN KE OBJECT MATERIAL
+        // ============================================
+        $material->statistics = [
+            'total_peserta' => $totalPeserta,
+            'jumlah_hadir' => $jumlahHadir,
+            'jumlah_download' => $jumlahDownload,
+            'jumlah_tonton' => $jumlahTonton,
+            'jumlah_pretest' => $jumlahPretest,
+            'jumlah_posttest' => $jumlahPosttest,
+            'pretest_lulus' => $pretestLulus,
+            'posttest_lulus' => $posttestLulus,
+            'persentase_hadir' => $persentaseHadir,
+            'persentase_download' => $persentaseDownload,
+            'persentase_tonton' => $persentaseTonton,
+            'persentase_pretest' => $persentasePretest,
+            'persentase_posttest' => $persentasePosttest,
+            'rata_rata_pretest' => $rataRataPretest,
+            'rata_rata_posttest' => $rataRataPosttest,
+        ];
+        
+        // Decode JSON fields untuk keperluan tampilan
+        $this->decodeJsonFields($material);
+    });
+    
+    // Pass request parameters untuk view
+    $search = $request->get('search', '');
+    $status = $request->get('status', '');
+    $type = $request->get('type', '');
+    
+    return view('admin.kursus.materials.index', compact(
+        'kursus', 
+        'materials', 
+        'search', 
+        'status', 
+        'type', 
+        'perPage'
+    ));
+}
+
+/**
+ * Helper method untuk decode JSON fields
+ */
+/**
+ * Helper method untuk decode JSON fields
+ */
+private function decodeJsonFields($material)
+{
+    // Decode soal_pretest jika ada
+    if (!empty($material->soal_pretest)) {
+        try {
+            // Jika sudah array, langsung gunakan
+            if (is_array($material->soal_pretest)) {
+                $material->soal_pretest_array = $material->soal_pretest;
+            } 
+            // Jika string, decode JSON
+            elseif (is_string($material->soal_pretest)) {
                 $decoded = json_decode($material->soal_pretest, true);
                 if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
                     $material->soal_pretest_array = $decoded;
                 } else {
                     $material->soal_pretest_array = [];
                 }
-            } catch (\Exception $e) {
+            } else {
                 $material->soal_pretest_array = [];
             }
-        } else {
+        } catch (\Exception $e) {
             $material->soal_pretest_array = [];
         }
-        
-        // Decode soal_posttest jika ada
-        if (!empty($material->soal_posttest)) {
-            try {
+    } else {
+        $material->soal_pretest_array = [];
+    }
+    
+    // Decode soal_posttest jika ada
+    if (!empty($material->soal_posttest)) {
+        try {
+            // Jika sudah array, langsung gunakan
+            if (is_array($material->soal_posttest)) {
+                $material->soal_posttest_array = $material->soal_posttest;
+            } 
+            // Jika string, decode JSON
+            elseif (is_string($material->soal_posttest)) {
                 $decoded = json_decode($material->soal_posttest, true);
                 if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
                     $material->soal_posttest_array = $decoded;
                 } else {
                     $material->soal_posttest_array = [];
                 }
-            } catch (\Exception $e) {
+            } else {
                 $material->soal_posttest_array = [];
             }
-        } else {
+        } catch (\Exception $e) {
             $material->soal_posttest_array = [];
         }
-        
-        // Decode file_path jika ada
-        if (!empty($material->file_path)) {
-            try {
+    } else {
+        $material->soal_posttest_array = [];
+    }
+    
+    // Decode file_path jika ada
+    if (!empty($material->file_path)) {
+        try {
+            // Jika sudah array, langsung gunakan
+            if (is_array($material->file_path)) {
+                $material->file_path_array = $material->file_path;
+            } 
+            // Jika string, decode JSON
+            elseif (is_string($material->file_path)) {
                 $decoded = json_decode($material->file_path, true);
                 if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
                     $material->file_path_array = $decoded;
                 } else {
                     $material->file_path_array = [];
                 }
-            } catch (\Exception $e) {
+            } else {
                 $material->file_path_array = [];
             }
-        } else {
+        } catch (\Exception $e) {
             $material->file_path_array = [];
         }
-    });
+    } else {
+        $material->file_path_array = [];
+    }
     
-    return view('admin.kursus.materials.index', compact('kursus', 'materials'));
+    // Decode video_data jika ada
+    if (!empty($material->video_file)) {
+        try {
+            // Jika sudah array, langsung gunakan
+            if (is_array($material->video_file)) {
+                $material->video_data = $material->video_file;
+            } 
+            // Jika string, decode JSON
+            elseif (is_string($material->video_file)) {
+                $decoded = json_decode($material->video_file, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $material->video_data = $decoded;
+                } else {
+                    $material->video_data = [];
+                }
+            } else {
+                $material->video_data = [];
+            }
+        } catch (\Exception $e) {
+            $material->video_data = [];
+        }
+    } else {
+        $material->video_data = [];
+    }
 }
 
     // TAMBAHKAN METHOD UPDATE ORDER INI
@@ -171,7 +365,7 @@ class MaterialController extends Controller
             'video_questions.*.options' => 'nullable|array|min:2|max:4',
             'video_questions.*.options.*' => 'nullable|string|max:255',
             'video_questions.*.correct_option' => 'nullable|integer|min:0|max:3',
-            'video_questions.*.points' => 'nullable|integer|min:1|max:10',
+            'video_questions.*.points' => 'nullable|integer|min:10|max:100',
             'video_questions.*.explanation' => 'nullable|string',
             'video_questions.*.required_to_continue' => 'boolean',
         ]);
@@ -1066,7 +1260,7 @@ public function update(Request $request, Kursus $kursus, Materials $material)
                             "video_questions.{$index}.question" => 'nullable|string|max:500',
                             "video_questions.{$index}.time_in_seconds" => 'nullable|integer|min:0',
                             "video_questions.{$index}.correct_option" => 'nullable|integer|min:0|max:3',
-                            "video_questions.{$index}.points" => 'nullable|integer|min:1|max:10',
+                            "video_questions.{$index}.points" => 'nullable|integer|min:10|max:100',
                             "video_questions.{$index}.required_to_continue" => 'nullable|boolean',
                         ]);
                     }
@@ -2415,6 +2609,119 @@ private function hasExistingVideoData($material)
     }
 }
 
+// app/Http\Controllers\Admin\MaterialController.php
+
+// Tambahkan method baru untuk multi-delete
+public function bulkDestroy(Request $request, Kursus $kursus)
+{
+    $request->validate([
+        'ids' => 'required|array',
+        'ids.*' => 'exists:materials,id'
+    ]);
+
+    try {
+        $materials = Materials::whereIn('id', $request->ids)
+            ->where('course_id', $kursus->id)
+            ->get();
+
+        $deletedCount = 0;
+        $errors = [];
+
+        foreach ($materials as $material) {
+            try {
+                // Delete files
+                if ($material->file_path) {
+                    $files = [];
+                    
+                    if (is_array($material->file_path)) {
+                        $files = $material->file_path;
+                    } elseif (is_string($material->file_path) && !empty($material->file_path)) {
+                        $decoded = json_decode($material->file_path, true);
+                        if (is_array($decoded)) {
+                            $files = $decoded;
+                        }
+                    }
+                    
+                    if (is_array($files)) {
+                        foreach ($files as $filePath) {
+                            if (is_string($filePath) && !empty($filePath)) {
+                                Storage::disk('public')->delete($filePath);
+                            }
+                        }
+                    }
+                }
+
+                // Delete video file dari Google Drive
+                if ($material->video_file) {
+                    try {
+                        $videoData = [];
+                        
+                        if (is_array($material->video_file)) {
+                            $videoData = $material->video_file;
+                        } elseif (is_string($material->video_file) && !empty($material->video_file)) {
+                            $decoded = json_decode($material->video_file, true);
+                            if (is_array($decoded)) {
+                                $videoData = $decoded;
+                            }
+                        }
+                        
+                        if (!empty($videoData)) {
+                            if (isset($videoData['type']) && $videoData['type'] === 'hosted' && isset($videoData['file_id'])) {
+                                $this->deleteFromGoogleDrive($videoData['file_id']);
+                            } elseif (isset($videoData['type']) && $videoData['type'] === 'local' && isset($videoData['path'])) {
+                                Storage::disk('public')->delete($videoData['path']);
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        Log::error('Error deleting video file for material ' . $material->id . ': ' . $e->getMessage());
+                        $errors[] = 'Material ' . $material->title . ': Gagal menghapus video - ' . $e->getMessage();
+                    }
+                }
+
+                // Delete video questions
+                VideoQuestion::where('material_id', $material->id)->delete();
+                
+                // Delete video progress
+                UserVideoProgress::where('material_id', $material->id)->delete();
+
+                // Delete material progress
+                MaterialProgress::where('material_id', $material->id)->delete();
+
+                // Delete material
+                $material->delete();
+                $deletedCount++;
+
+            } catch (\Exception $e) {
+                Log::error('Error deleting material ' . $material->id . ': ' . $e->getMessage());
+                $errors[] = 'Material ' . $material->title . ': ' . $e->getMessage();
+            }
+        }
+
+        // Reorder materials yang tersisa
+        $this->reorderMaterials($kursus->id);
+
+        if (empty($errors)) {
+            return response()->json([
+                'success' => true,
+                'message' => $deletedCount . ' materi berhasil dihapus!'
+            ]);
+        } else {
+            return response()->json([
+                'success' => false,
+                'message' => $deletedCount . ' materi berhasil dihapus, tetapi ada beberapa error: ' . implode(', ', $errors)
+            ], 207);
+        }
+
+    } catch (\Exception $e) {
+        Log::error('Error in bulk destroy: ' . $e->getMessage());
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'Gagal menghapus materi: ' . $e->getMessage()
+        ], 500);
+    }
+}
+
 /**
  * Get YouTube video duration via API
  */
@@ -3019,69 +3326,25 @@ public function downloadTemplate()
     /**
      * Get video duration (optional - untuk implementasi nanti)
      */
-    private function getVideoDuration($file)
+public function getVideoDuration($videoFile)
 {
     try {
-        // Cek apakah FFmpeg tersedia di Windows Laragon
-        $ffmpegPath = 'C:\laragon\bin\ffmpeg\bin\ffmpeg.exe';
-        
-        // Jika tidak ada di path default, coba cari di PATH
-        if (!file_exists($ffmpegPath)) {
-            $ffmpegPath = 'ffmpeg';
-        }
-        
-        // Cek jika FFmpeg tersedia
-        $tempPath = $file->getRealPath();
-        
-        // Gunakan shell_exec untuk Windows
-        if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-            // Command untuk Windows
-            $command = "\"$ffmpegPath\" -i \"" . escapeshellarg($tempPath) . "\" 2>&1";
+        if ($videoFile instanceof \Illuminate\Http\UploadedFile) {
+            $tempPath = $videoFile->getRealPath();
         } else {
-            // Command untuk Linux/Mac
-            $command = "$ffmpegPath -i " . escapeshellarg($tempPath) . " 2>&1";
+            $tempPath = $videoFile;
         }
         
-        $output = shell_exec($command);
-        
-        if ($output) {
-            // Parse duration dari output
-            preg_match('/Duration: (\d{2}):(\d{2}):(\d{2})\.\d{2}/', $output, $matches);
+        $ffprobe = FFProbe::create();
+        $duration = $ffprobe
+            ->format($tempPath)
+            ->get('duration');
             
-            if (count($matches) >= 4) {
-                $hours = (int)$matches[1];
-                $minutes = (int)$matches[2];
-                $seconds = (int)$matches[3];
-                
-                $totalSeconds = ($hours * 3600) + ($minutes * 60) + $seconds;
-                return (int)$totalSeconds;
-            }
-        }
-        
-        // Fallback: Coba dengan alternatif (getID3)
-        if (class_exists('\getID3')) {
-            $getID3 = new \getID3();
-            $fileInfo = $getID3->analyze($tempPath);
-            
-            if (isset($fileInfo['playtime_seconds'])) {
-                return (int)$fileInfo['playtime_seconds'];
-            }
-        }
-        
-        // Fallback: Coba menggunakan PHP-FFMpeg jika tersedia
-        if (class_exists('\FFMpeg\FFMpeg')) {
-            $ffmpeg = \FFMpeg\FFMpeg::create();
-            $video = $ffmpeg->open($tempPath);
-            $duration = $video->getFormat()->get('duration');
-            
-            return (int)$duration;
-        }
-        
+        return floor($duration);
     } catch (\Exception $e) {
-        Log::warning('Error getting video duration: ' . $e->getMessage());
+        // PERBAIKAN: Gunakan facade dengan benar
+        \Illuminate\Support\Facades\Log::error('Error getting video duration: ' . $e->getMessage());
+        return 0;
     }
-    
-    // Default: 0 (durasi tidak diketahui)
-    return 0;
 }
 }

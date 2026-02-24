@@ -850,98 +850,98 @@
                                             
                                             <div class="player-config-grid">
                                                <!-- Izinkan Skip -->
-<div class="config-item">
-    <div class="form-check form-switch">
-        <input class="form-check-input" type="checkbox" id="allow_skip" 
-               name="allow_skip" value="1" {{ old('allow_skip', $material->allow_skip) ? 'checked' : '' }}>
-        <label class="form-check-label fw-bold" for="allow_skip">
-            Izinkan Skip Video
-        </label>
-    </div>
-    <small class="text-muted">
-        Aktifkan jika peserta boleh langsung lanjut tanpa menonton video
-    </small>
-</div>
+                                                <div class="config-item">
+                                                    <div class="form-check form-switch">
+                                                        <input class="form-check-input" type="checkbox" id="allow_skip" 
+                                                            name="allow_skip" value="1" {{ old('allow_skip', $material->allow_skip) ? 'checked' : '' }}>
+                                                        <label class="form-check-label fw-bold" for="allow_skip">
+                                                            Izinkan Skip Video
+                                                        </label>
+                                                    </div>
+                                                    <small class="text-muted">
+                                                        Aktifkan jika peserta boleh langsung lanjut tanpa menonton video
+                                                    </small>
+                                                </div>
 
-<div class="config-item">
-    <div class="form-check form-switch">
-        <input class="form-check-input" type="checkbox" id="disable_forward_seek" 
-               name="disable_forward_seek" value="1" {{ old('disable_forward_seek', $playerConfig['disable_forward_seek'] ?? false) ? 'checked' : '' }}>
-        <label class="form-check-label fw-bold" for="disable_forward_seek">
-            Kunci Gerak Maju
-        </label>
-    </div>
-    <small class="text-muted">
-        Aktifkan untuk mencegah peserta mempercepat video ke bagian yang belum ditonton
-    </small>
-</div>
+                                                <div class="config-item">
+                                                    <div class="form-check form-switch">
+                                                        <input class="form-check-input" type="checkbox" id="disable_forward_seek" 
+                                                            name="disable_forward_seek" value="1" {{ old('disable_forward_seek', $playerConfig['disable_forward_seek'] ?? false) ? 'checked' : '' }}>
+                                                        <label class="form-check-label fw-bold" for="disable_forward_seek">
+                                                            Kunci Gerak Maju
+                                                        </label>
+                                                    </div>
+                                                    <small class="text-muted">
+                                                        Aktifkan untuk mencegah peserta mempercepat video ke bagian yang belum ditonton
+                                                    </small>
+                                                </div>
 
-<div class="config-item">
-    <div class="form-check form-switch">
-        <input class="form-check-input" type="checkbox" id="disable_backward_seek" 
-               name="disable_backward_seek" value="1" {{ old('disable_backward_seek', $playerConfig['disable_backward_seek'] ?? false) ? 'checked' : '' }}>
-        <label class="form-check-label fw-bold" for="disable_backward_seek">
-            Kunci Gerak Mundur
-        </label>
-    </div>
-    <small class="text-muted">
-        Aktifkan untuk mencegah peserta mengulang bagian video yang sudah lewat
-    </small>
-</div>
+                                                <div class="config-item">
+                                                    <div class="form-check form-switch">
+                                                        <input class="form-check-input" type="checkbox" id="disable_backward_seek" 
+                                                            name="disable_backward_seek" value="1" {{ old('disable_backward_seek', $playerConfig['disable_backward_seek'] ?? false) ? 'checked' : '' }}>
+                                                        <label class="form-check-label fw-bold" for="disable_backward_seek">
+                                                            Kunci Gerak Mundur
+                                                        </label>
+                                                    </div>
+                                                    <small class="text-muted">
+                                                        Aktifkan untuk mencegah peserta mengulang bagian video yang sudah lewat
+                                                    </small>
+                                                </div>
 
-<div class="config-item">
-    <div class="form-check form-switch">
-        <input class="form-check-input" type="checkbox" id="disable_right_click" 
-               name="disable_right_click" value="1" {{ old('disable_right_click', $playerConfig['disable_right_click'] ?? false) ? 'checked' : '' }}>
-        <label class="form-check-label fw-bold" for="disable_right_click">
-            Larang Klik Kanan
-        </label>
-    </div>
-    <small class="text-muted">
-        Aktifkan untuk melindungi video dari download dengan menonaktifkan klik kanan
-    </small>
-</div>
+                                                <div class="config-item">
+                                                    <div class="form-check form-switch">
+                                                        <input class="form-check-input" type="checkbox" id="disable_right_click" 
+                                                            name="disable_right_click" value="1" {{ old('disable_right_click', $playerConfig['disable_right_click'] ?? false) ? 'checked' : '' }}>
+                                                        <label class="form-check-label fw-bold" for="disable_right_click">
+                                                            Larang Klik Kanan
+                                                        </label>
+                                                    </div>
+                                                    <small class="text-muted">
+                                                        Aktifkan untuk melindungi video dari download dengan menonaktifkan klik kanan
+                                                    </small>
+                                                </div>
 
-<!-- Completion Requirements -->
-<div class="config-item">
-    <div class="form-check form-switch">
-        <input class="form-check-input" type="checkbox" id="require_completion" 
-               name="require_completion" value="1" {{ old('require_completion', $playerConfig['require_completion'] ?? false) ? 'checked' : '' }}>
-        <label class="form-check-label fw-bold" for="require_completion">
-            Wajib Tuntas Nonton
-        </label>
-    </div>
-    <small class="text-muted">
-        Aktifkan jika peserta harus menyelesaikan video 100% untuk bisa lanjut
-    </small>
-</div>
+                                                <!-- Completion Requirements -->
+                                                <div class="config-item">
+                                                    <div class="form-check form-switch">
+                                                        <input class="form-check-input" type="checkbox" id="require_completion" 
+                                                            name="require_completion" value="1" {{ old('require_completion', $playerConfig['require_completion'] ?? false) ? 'checked' : '' }}>
+                                                        <label class="form-check-label fw-bold" for="require_completion">
+                                                            Wajib Tuntas Nonton
+                                                        </label>
+                                                    </div>
+                                                    <small class="text-muted">
+                                                        Aktifkan jika peserta harus menyelesaikan video 100% untuk bisa lanjut
+                                                    </small>
+                                                </div>
 
-<!-- Video Questions -->
-<div class="config-item">
-    <div class="form-check form-switch">
-        <input class="form-check-input" type="checkbox" id="auto_pause_on_question" 
-               name="auto_pause_on_question" value="1" {{ old('auto_pause_on_question', $playerConfig['auto_pause_on_question'] ?? false) ? 'checked' : '' }}>
-        <label class="form-check-label fw-bold" for="auto_pause_on_question">
-            Jeda Otomatis
-        </label>
-    </div>
-    <small class="text-muted">
-        Aktifkan agar video berhenti otomatis saat ada pertanyaan
-    </small>
-</div>
+                                                <!-- Video Questions -->
+                                                <div class="config-item">
+                                                    <div class="form-check form-switch">
+                                                        <input class="form-check-input" type="checkbox" id="auto_pause_on_question" 
+                                                            name="auto_pause_on_question" value="1" {{ old('auto_pause_on_question', $playerConfig['auto_pause_on_question'] ?? false) ? 'checked' : '' }}>
+                                                        <label class="form-check-label fw-bold" for="auto_pause_on_question">
+                                                            Jeda Otomatis
+                                                        </label>
+                                                    </div>
+                                                    <small class="text-muted">
+                                                        Aktifkan agar video berhenti otomatis saat ada pertanyaan
+                                                    </small>
+                                                </div>
 
-<div class="config-item">
-    <div class="form-check form-switch">
-        <input class="form-check-input" type="checkbox" id="require_question_completion" 
-               name="require_question_completion" value="1" {{ old('require_question_completion', $playerConfig['require_question_completion'] ?? false) ? 'checked' : '' }}>
-        <label class="form-check-label fw-bold" for="require_question_completion">
-            Wajib Jawab Pertanyaan
-        </label>
-    </div>
-    <small class="text-muted">
-        Aktifkan jika peserta harus menjawab pertanyaan untuk lanjut video
-    </small>
-</div>
+                                                <div class="config-item">
+                                                    <div class="form-check form-switch">
+                                                        <input class="form-check-input" type="checkbox" id="require_question_completion" 
+                                                            name="require_question_completion" value="1" {{ old('require_question_completion', $playerConfig['require_question_completion'] ?? false) ? 'checked' : '' }}>
+                                                        <label class="form-check-label fw-bold" for="require_question_completion">
+                                                            Wajib Jawab Pertanyaan
+                                                        </label>
+                                                    </div>
+                                                    <small class="text-muted">
+                                                        Aktifkan jika peserta harus menjawab pertanyaan untuk lanjut video
+                                                    </small>
+                                                </div>
                                             </div>
                                         </div>
 
@@ -1892,57 +1892,64 @@ function setupVideoField() {
 // VALIDASI VIDEO UNTUK EDIT MODE
 // ============================================
 
-// Fungsi validasi video untuk edit mode
 function validateVideoForEdit(contentTypes) {
     if (!contentTypes.includes('video')) return [];
-    
+
     const videoType = document.getElementById('video_type').value;
     const videoUrl = document.getElementById('video_url').value;
-    
-    // PERBAIKAN: Ambil existing data dari PHP
+
+    // Ambil existing data dari PHP
     const existingVideoUrl = "{{ $material->video_url ?? '' }}";
-    const existingVideoFile = "{{ $material->video_file ?? '' }}";
-    
+    const existingVideoFile = @json($material->video_file);
+
+    const hasExistingVideoUrl =
+        typeof existingVideoUrl === 'string' &&
+        existingVideoUrl.trim() !== '';
+
+    const hasExistingVideoFile =
+        existingVideoFile &&
+        typeof existingVideoFile === 'object' &&
+        Object.keys(existingVideoFile).length > 0;
+
     console.log('Video Validation - Edit Mode:', {
-        videoType: videoType,
-        videoUrl: videoUrl,
-        existingVideoUrl: existingVideoUrl,
-        existingVideoFile: existingVideoFile,
-        hasExistingVideoUrl: existingVideoUrl.trim() !== '',
-        hasExistingVideoFile: existingVideoFile.trim() !== ''
+        videoType,
+        videoUrl,
+        existingVideoUrl,
+        existingVideoFile,
+        hasExistingVideoUrl,
+        hasExistingVideoFile
     });
-    
+
     const errors = [];
-    
+
     if (!videoType) {
         errors.push('Jenis video harus dipilih');
         return errors;
     }
-    
+
     if (videoType === 'youtube') {
-        // Untuk edit: jika ada existing URL, biarkan kosong (akan tetap pakai existing)
-        // Jika tidak ada existing dan tidak ada URL baru, error
-        const hasExistingVideoUrl = existingVideoUrl && existingVideoUrl.trim() !== '';
-        const hasNewVideoUrl = videoUrl && videoUrl.trim() !== '';
-        
+        const hasNewVideoUrl =
+            typeof videoUrl === 'string' &&
+            videoUrl.trim() !== '';
+
         if (!hasExistingVideoUrl && !hasNewVideoUrl) {
             errors.push('URL YouTube harus diisi');
         } else if (hasNewVideoUrl && !isValidYouTubeUrl(videoUrl)) {
             errors.push('URL YouTube tidak valid');
         }
-    } else if (videoType === 'hosted' || videoType === 'local') {
-        // Untuk hosted/local: jika ada existing file, biarkan kosong
-        // Jika tidak ada existing dan tidak ada file baru, error
-        const hasExistingVideoFile = existingVideoFile && existingVideoFile.trim() !== '';
+    }
+
+    if (videoType === 'hosted' || videoType === 'local') {
         const hasNewVideoFile = currentVideoFile !== null;
-        
+
         if (!hasExistingVideoFile && !hasNewVideoFile) {
             errors.push('File video harus diupload untuk jenis video ini');
         }
     }
-    
+
     return errors;
 }
+
 
 // Validasi URL YouTube
 function isValidYouTubeUrl(url) {
@@ -2284,8 +2291,8 @@ function addVideoQuestion(existingData = null, index = null) {
             <div class="col-md-6">
                 <label class="form-label">Poin</label>
                 <input type="number" class="form-control" name="video_questions[${questionId}][points]" 
-                       min="1" max="10" value="${data.points || 1}">
-                <small class="text-muted">Poin untuk jawaban benar (1-10)</small>
+                       min="10" max="100" value="${data.points || 1}">
+                <small class="text-muted">Poin untuk jawaban benar (10-100)</small>
             </div>
         </div>
         
@@ -3058,8 +3065,8 @@ document.addEventListener('DOMContentLoaded', function() {
         existingPosttestCount: existingPosttest.length,
         existingVideoQuestionsCount: existingVideoQuestions.length,
         existingFilesCount: existingFiles.length,
-        existingVideoUrl: "{{ $material->video_url ?? 'null' }}",
-        existingVideoFile: "{{ $material->video_file ?? 'null' }}"
+        existingVideoUrl: "{{ $material->video_url ?? '' }}",
+        existingVideoFile: @json($material->video_file)
     });
     
     // Set initial state untuk content types

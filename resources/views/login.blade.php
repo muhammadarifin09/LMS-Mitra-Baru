@@ -6,6 +6,8 @@
     <title>Login | LMS MOOC Mitra</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
 
     <style>
         body {
@@ -115,14 +117,23 @@
 
                 <div class="mb-3">
                     <label for="password" class="form-label">Password</label>
-                    <input type="password" name="password" id="password" 
-                           class="form-control @error('password') is-invalid @enderror" 
-                           placeholder="Masukkan password" 
-                           required>
+
+                    <div class="input-group">
+                        <input type="password" name="password" id="password" 
+                            class="form-control @error('password') is-invalid @enderror" 
+                            placeholder="Masukkan password"
+                            required>
+
+                        <span class="input-group-text bg-white" style="cursor:pointer;" onclick="togglePassword()">
+                            <i id="toggleIcon" class="bi bi-eye"></i>
+                        </span>
+                    </div>
+
                     @error('password')
-                        <div class="invalid-feedback">{{ $message }}</div>
+                        <div class="invalid-feedback d-block">{{ $message }}</div>
                     @enderror
                 </div>
+
 
                 <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-3">
                     <a href="{{ route('password.request') }}" class="text-primary small text-decoration-none">Lupa kata sandi?</a>
@@ -163,5 +174,23 @@
             }
         });
     </script>
+
+    <script>
+    function togglePassword() {
+        const password = document.getElementById("password");
+        const icon = document.getElementById("toggleIcon");
+
+        if (password.type === "password") {
+            password.type = "text";
+            icon.classList.remove("bi-eye");
+            icon.classList.add("bi-eye-slash");
+        } else {
+            password.type = "password";
+            icon.classList.remove("bi-eye-slash");
+            icon.classList.add("bi-eye");
+        }
+    }
+    </script>
+
 </body>
 </html>
