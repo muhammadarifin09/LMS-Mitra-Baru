@@ -201,11 +201,7 @@
                                 
                                 <td class="text-center">
                                     @if(isset($n['nilai']) && $n['nilai'] !== null)
-                                        <span class="display-6 fw-bold 
-                                            @if($n['nilai'] >= 80) text-success
-                                            @elseif($n['nilai'] >= 60) text-warning
-                                            @else text-danger
-                                            @endif">
+                                        <span class="display-6 fw-bold text-black">
                                             {{ $n['nilai'] }}
                                         </span>
                                     @else

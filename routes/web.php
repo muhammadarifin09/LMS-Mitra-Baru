@@ -18,6 +18,7 @@ use App\Http\Controllers\Mitra\KursusController as MitraKursusController;
 use App\Http\Controllers\Mitra\DashboardController as MitraDashboardController;
 use App\Http\Controllers\Mitra\CertificateController;
 use App\Http\Controllers\Admin\LaporanController;
+use App\Http\Controllers\Admin\SettingController;
 
 // Login
 Route::get('/', fn() => view('login'))->name('login.page');
@@ -419,3 +420,8 @@ if (app()->environment('local')) {
         ]);
     });
 }
+
+Route::prefix('admin')->middleware(['auth', 'role:admin'])->group(function () {
+    Route::get('settings', [SettingController::class, 'edit'])->name('admin.settings');
+    Route::post('settings', [SettingController::class, 'update'])->name('admin.settings.update');
+});

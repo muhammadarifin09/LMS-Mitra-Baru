@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\MaterialProgress;
 use App\Models\UserVideoQuestionAnswer;
 use App\Models\Kursus;
+use App\Models\Setting;
 
 class NilaiService
 {
@@ -75,12 +76,14 @@ class NilaiService
 }
 
 
-    public function statusNilai(?float $nilai): string
-    {
-        if ($nilai === null) {
-            return 'belum';
-        }
-
-        return $nilai >= 60 ? 'lulus' : 'tidak_lulus';
+   public function statusNilai(?float $nilai): string
+{
+    if ($nilai === null) {
+        return 'belum';
     }
+
+    $kkm = Setting::getValue('kkm_global', 60);
+
+    return $nilai >= (int)$kkm ? 'lulus' : 'tidak_lulus';
+}
 }

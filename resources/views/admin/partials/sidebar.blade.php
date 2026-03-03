@@ -21,11 +21,13 @@
             <span>Manajemen Biodata</span>
         </a>
 
-        <a href="{{ route('admin.kursus.index') }}"
-           class="sidebar-item {{ request()->routeIs('admin.kursus.*') ? 'active' : '' }}">
-            <i class="fas fa-book"></i>
-            <span>Manajemen Kursus</span>
+            <a href="{{ route('admin.settings') }}"
+        class="sidebar-item {{ request()->routeIs('admin.settings') || request()->routeIs('admin.settings.*') ? 'active' : '' }}">
+            <i class="fas fa-cog"></i>
+            <span>Pengaturan Nilai</span>
         </a>
+
+
 
         {{-- MENU LAPORAN DROPDOWN --}}
         <div class="sidebar-dropdown-wrapper">
