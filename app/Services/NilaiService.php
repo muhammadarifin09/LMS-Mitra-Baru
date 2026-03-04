@@ -86,4 +86,5 @@ class NilaiService
 
     return $nilai >= (int)$kkm ? 'lulus' : 'tidak_lulus';
 }
+
 }
